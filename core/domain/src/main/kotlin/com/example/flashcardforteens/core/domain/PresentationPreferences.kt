@@ -3,6 +3,7 @@ package com.example.flashcardforteens.core.domain
 enum class SpeechScene {
   HOME_WORD, STUDY_PROMPT, STUDY_CONTEXT, STUDY_EXPLANATION, ANSWER_FEEDBACK,
   WORD_DETAIL, WORD_PRONUNCIATION, MEANING_PRONUNCIATION, EXAMPLE_PRONUNCIATION,
+  STUDY_EXPLANATION_WORD, STUDY_EXPLANATION_EXAMPLE,
 }
 
 enum class SpeechMode {
@@ -25,11 +26,26 @@ data class SpeechOptions(val modes: Map<SpeechScene, SpeechMode> = emptyMap()) {
   fun mode(scene: SpeechScene, defaultLanguage: AppLanguage): SpeechMode =
     modes[scene] ?: when (scene) {
       SpeechScene.HOME_WORD, SpeechScene.WORD_DETAIL, SpeechScene.WORD_PRONUNCIATION -> SpeechMode.BOTH
+      // Keep explicit legacy explanation preferences when splitting word and sentence playback.
+      SpeechScene.STUDY_EXPLANATION_WORD, SpeechScene.STUDY_EXPLANATION_EXAMPLE ->
+        modes[SpeechScene.STUDY_EXPLANATION] ?: SpeechMode.BOTH
       SpeechScene.MEANING_PRONUNCIATION, SpeechScene.EXAMPLE_PRONUNCIATION -> SpeechMode.forLanguage(defaultLanguage)
       else -> SpeechMode.ONLY_EN
     }
 
   fun withMode(scene: SpeechScene, mode: SpeechMode) = copy(modes = modes + (scene to mode))
+
+  fun withLanguage(scene: SpeechScene, language: AppLanguage, enabled: Boolean): SpeechOptions {
+    val current = mode(scene, AppLanguage.EN)
+    val english = if (language == AppLanguage.EN) enabled else current.allows(AppLanguage.EN)
+    val chinese = if (language == AppLanguage.CN) enabled else current.allows(AppLanguage.CN)
+    return withMode(scene, when {
+      english && chinese -> SpeechMode.BOTH
+      english -> SpeechMode.ONLY_EN
+      chinese -> SpeechMode.ONLY_CN
+      else -> SpeechMode.NONE
+    })
+  }
 
   fun requests(request: SpeechRequest): List<SpeechRequest> {
     // Question audio cannot disclose the answer, even if a saved preference enables both languages.

@@ -14,6 +14,13 @@
     <string name="profile_reading_both">英语和中文</string>
     <string name="profile_reading_none">不朗读</string>
     <string name="profile_reading_hint">点选声音，答题前只读英语</string>
+    <string name="profile_reading_wrong_answer">答错后的朗读</string>
+    <string name="profile_explanation_title">学习与答对后自动朗读</string>
+    <string name="profile_explanation_hint">按以下顺序播放，关闭的项目会跳过。朗读的例句与页面展示保持一致。</string>
+    <string name="profile_explanation_word">① 单词朗读</string>
+    <string name="profile_explanation_meaning">② 中文释义朗读</string>
+    <string name="profile_explanation_sentence">③ 句子朗读</string>
+    <string name="profile_explanation_translation">④ 句子翻译朗读</string>
     <string name="profile_reading_summary">英语 / 中文</string>
     <string name="profile_growth_progress">本级 %1$d / %2$d 天</string>
     <string name="profile_growth_remaining">还差 %1$d 天</string>

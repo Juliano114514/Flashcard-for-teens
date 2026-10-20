@@ -34,6 +34,20 @@ internal class StudyPlayback(private val requests: (SpeechRequest) -> List<Speec
   fun cancel() { activeSequence?.cancel(); activeSequence = null }
 
   inner class Sequence internal constructor() {
+    /** Study and correct-answer pages share ordering, preferences and failure handling. */
+    suspend fun speakCard(card: StudyCard, isCurrent: () -> Boolean): Boolean {
+      var succeeded = true
+      val pageRequests = listOf(card.targetSpeech()) + card.playbackExamples().map { card.exampleSpeech(it) }
+      for (request in pageRequests) {
+        currentCoroutineContext().ensureActive()
+        if (!isCurrent()) return false
+        // Always try later enabled parts, even if an earlier audio resource is unavailable.
+        val played = speak(request)
+        succeeded = succeeded && played
+      }
+      return succeeded
+    }
+
     suspend fun speak(request: SpeechRequest, immediate: Boolean = false): Boolean {
       val first = requests(request).firstOrNull() ?: return true
       if (request.text.isBlank()) return false
@@ -57,8 +71,11 @@ internal fun StudyCard.contextExample(): ExampleSentence? = if (showContext && w
 } else null
 
 internal fun StudyCard.playbackExamples(): List<ExampleSentence> = when (phase) {
-  CardPhase.INTRO, CardPhase.EXPLANATION -> word.examples
+  // Match the first example visible when entering the explanation page.
+  CardPhase.INTRO, CardPhase.EXPLANATION -> word.examples.take(1)
   CardPhase.QUESTION -> listOfNotNull(contextExample())
+  CardPhase.FEEDBACK -> if (correct == true)
+    listOfNotNull(contextExample() ?: word.examples.firstOrNull()) else emptyList()
   else -> emptyList()
 }
 
@@ -68,8 +85,8 @@ internal fun StudyCard.promptSpeech(): SpeechRequest = targetSpeech().copy(
 internal fun StudyCard.targetSpeech(): SpeechRequest {
   val scene = when (phase) {
     CardPhase.QUESTION -> SpeechScene.STUDY_PROMPT
-    CardPhase.FEEDBACK -> SpeechScene.ANSWER_FEEDBACK
-    else -> SpeechScene.STUDY_EXPLANATION
+    CardPhase.FEEDBACK -> if (correct == true) SpeechScene.STUDY_EXPLANATION_WORD else SpeechScene.ANSWER_FEEDBACK
+    else -> SpeechScene.STUDY_EXPLANATION_WORD
   }
   // Never attach the Chinese answer to a question's playback request.
   val revealed = phase != CardPhase.QUESTION
@@ -87,7 +104,7 @@ internal fun StudyCard.optionLabel(option: AnswerOption): String = option.chines
 internal fun StudyCard.exampleSpeech(example: ExampleSentence): SpeechRequest {
   val question = phase == CardPhase.QUESTION
   return SpeechRequest(example.english, AppLanguage.EN,
-    if (question) SpeechScene.STUDY_CONTEXT else SpeechScene.STUDY_EXPLANATION,
+    if (question) SpeechScene.STUDY_CONTEXT else SpeechScene.STUDY_EXPLANATION_EXAMPLE,
     counterpart = example.chinese.takeIf { !question },
     chinesePronunciation = if (question) null else ChinesePronunciation(example.chinese, example.chinesePinyin))
 }

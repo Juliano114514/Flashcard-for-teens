@@ -109,12 +109,11 @@ fun StudyScreen(vm: StudyViewModel, onBack: () -> Unit,
           spokenPage = speechPage
           if (manualSpeech.revision != entryRevision) return@repeatOnLifecycle
           playback.sequence {
-            if (!speak(activeCard.targetSpeech())) return@sequence
-            for (example in activeCard.playbackExamples()) {
+            speakCard(activeCard) {
               val current = vm.state.value.card
-              if (vm.state.value.directionGeneration != generation || manualSpeech.revision != entryRevision || current?.id != activeCard.id ||
-                current.contextVersion != activeCard.contextVersion || current.phase != activeCard.phase) break
-              if (!speak(activeCard.exampleSpeech(example))) break
+              vm.state.value.directionGeneration == generation && manualSpeech.revision == entryRevision &&
+                current?.id == activeCard.id && current.contextVersion == activeCard.contextVersion &&
+                current.phase == activeCard.phase
             }
           }
         }
@@ -146,7 +145,11 @@ fun StudyScreen(vm: StudyViewModel, onBack: () -> Unit,
             withFrameNanos { }; withFrameNanos { }
             val active = vm.state.value.card
             if (vm.state.value.directionGeneration != generation || active == null || active.id != card.id || active.phase != CardPhase.FEEDBACK) return@sequence
-            val played = speak(card.targetSpeech())
+            val played = speakCard(card) {
+              val current = vm.state.value.card
+              vm.state.value.directionGeneration == generation && current?.id == card.id &&
+                current.contextVersion == card.contextVersion && current.phase == CardPhase.FEEDBACK
+            }
             currentCoroutineContext().ensureActive()
             val current = vm.state.value.card
             if (vm.state.value.directionGeneration == generation && current != null && current.id == card.id && current.phase == CardPhase.FEEDBACK) {

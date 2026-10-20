@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.items
@@ -23,6 +24,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -36,6 +38,7 @@ import androidx.compose.ui.text.style.TextAlign
 import com.example.flashcardforteens.core.ui.FlashcardTheme
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.flashcardforteens.core.domain.SpeechMode
@@ -52,12 +55,50 @@ import com.example.flashcardforteens.core.ui.R as UiR
 fun ReadingOptionsScreen(vm: ProfileViewModel, onBack: () -> Unit) {
   val state by vm.state.collectAsStateWithLifecycle()
   OptionsPage(uiString(UiR.string.ui_reading_options), stringResource(R.string.profile_reading_hint), state, onBack, vm::retry) {
-    items(SpeechScene.entries, key = { it.name }, contentType = { "speech-scene" }) { scene ->
+    item(key = "explanation-sequence") {
+      ExplanationPlaybackCard(state.stored.speechOptions, enabled = !state.loading && !state.saving) {
+        vm.save(ProfileUpdate(speechOptions = it))
+      }
+    }
+    items(otherSpeechScenes, key = { it.name }, contentType = { "speech-scene" }) { scene ->
       val defaultLanguage = if (scene == SpeechScene.MEANING_PRONUNCIATION) AppLanguage.CN else AppLanguage.EN
       SpeechSceneCard(scene, state.stored.speechOptions.mode(scene, defaultLanguage),
         enabled = !state.loading && !state.saving, onMode = { mode ->
           vm.save(ProfileUpdate(speechOptions = state.stored.speechOptions.withMode(scene, mode)))
         })
+    }
+  }
+}
+
+private val otherSpeechScenes = SpeechScene.entries.filterNot {
+  it == SpeechScene.STUDY_EXPLANATION || it == SpeechScene.STUDY_EXPLANATION_WORD ||
+    it == SpeechScene.STUDY_EXPLANATION_EXAMPLE
+}
+
+@Composable
+private fun ExplanationPlaybackCard(options: SpeechOptions, enabled: Boolean, onChange: (SpeechOptions) -> Unit) {
+  Surface(shape = MaterialTheme.shapes.medium, color = MaterialTheme.colorScheme.surface,
+    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)) {
+    Column(Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
+      Text(stringResource(R.string.profile_explanation_title), Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+        style = MaterialTheme.typography.titleMedium)
+      Text(stringResource(R.string.profile_explanation_hint), Modifier.padding(horizontal = 16.dp).padding(bottom = 8.dp),
+        style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+      listOf(
+        Triple(SpeechScene.STUDY_EXPLANATION_WORD, AppLanguage.EN, R.string.profile_explanation_word),
+        Triple(SpeechScene.STUDY_EXPLANATION_WORD, AppLanguage.CN, R.string.profile_explanation_meaning),
+        Triple(SpeechScene.STUDY_EXPLANATION_EXAMPLE, AppLanguage.EN, R.string.profile_explanation_sentence),
+        Triple(SpeechScene.STUDY_EXPLANATION_EXAMPLE, AppLanguage.CN, R.string.profile_explanation_translation),
+      ).forEach { (scene, language, label) ->
+        val checked = options.mode(scene, AppLanguage.EN).allows(language)
+        Row(Modifier.fillMaxWidth().toggleable(value = checked, enabled = enabled, role = Role.Switch,
+          onValueChange = { onChange(options.withLanguage(scene, language, it)) })
+          .heightIn(min = 56.dp).padding(horizontal = 16.dp),
+          verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+          Text(stringResource(label), Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
+          Switch(checked = checked, onCheckedChange = null, enabled = enabled)
+        }
+      }
     }
   }
 }
@@ -128,7 +169,9 @@ private fun SpeechScene.labelId(): Int = when (this) {
   SpeechScene.STUDY_PROMPT -> UiR.string.ui_reading_study_prompt
   SpeechScene.STUDY_CONTEXT -> UiR.string.ui_reading_study_context
   SpeechScene.STUDY_EXPLANATION -> UiR.string.ui_reading_study_explanation
-  SpeechScene.ANSWER_FEEDBACK -> UiR.string.ui_reading_answer_feedback
+  SpeechScene.STUDY_EXPLANATION_WORD -> R.string.profile_explanation_word
+  SpeechScene.STUDY_EXPLANATION_EXAMPLE -> R.string.profile_explanation_sentence
+  SpeechScene.ANSWER_FEEDBACK -> R.string.profile_reading_wrong_answer
   SpeechScene.WORD_DETAIL -> UiR.string.ui_reading_word_detail
   SpeechScene.WORD_PRONUNCIATION -> UiR.string.ui_reading_word
   SpeechScene.MEANING_PRONUNCIATION -> UiR.string.ui_reading_meaning
@@ -149,7 +192,8 @@ private fun ReadingOptionsPreview() {
   FlashcardTheme {
     OptionsPage(uiString(UiR.string.ui_reading_options), stringResource(R.string.profile_reading_hint),
       ProfileUiState(loading = false), onBack = {}, onRetry = {}) {
-      items(SpeechScene.entries) { scene ->
+      item { ExplanationPlaybackCard(SpeechOptions(), enabled = true, onChange = {}) }
+      items(otherSpeechScenes) { scene ->
         val language = if (scene == SpeechScene.MEANING_PRONUNCIATION) AppLanguage.CN else AppLanguage.EN
         SpeechSceneCard(scene, SpeechOptions().mode(scene, language),
           enabled = true, onMode = {})

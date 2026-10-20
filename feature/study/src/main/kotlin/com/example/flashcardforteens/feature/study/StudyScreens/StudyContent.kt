@@ -169,7 +169,8 @@ internal fun StudyContent(
           CardPhase.INTRO, CardPhase.EXPLANATION -> {
             LearningPrimaryButton(onClick = onAdvance, enabled = !state.busy,
               modifier = Modifier.fillMaxWidth()) {
-              Text(if (card.phase == CardPhase.INTRO) uiString(UiR.string.ui_continue) else uiString(UiR.string.ui_next_word))
+              Text(if (card.phase == CardPhase.INTRO && card.canAnswer) uiString(UiR.string.ui_continue)
+                else uiString(UiR.string.ui_next_word))
             }
           }
           else -> Unit

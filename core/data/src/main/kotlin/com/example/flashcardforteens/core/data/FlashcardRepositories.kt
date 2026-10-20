@@ -571,10 +571,11 @@ class FlashcardRepositories(context: Context) {
         CardPhase.INTRO -> {
           val progress = dao.progress(card.wordId) ?: WordProgressEntity(card.wordId)
           dao.putProgress(progress.copy(firstEncounterShown = true))
-          dao.putCard(card.copy(phase = if (strings(JSONArray(card.optionsJson)).size == 4)
-            CardPhase.QUESTION.name else CardPhase.EXPLANATION.name))
+          if (strings(JSONArray(card.optionsJson)).size == 4)
+            dao.putCard(card.copy(phase = CardPhase.QUESTION.name))
+          else finishAndSelect(card, day)
         }
-        CardPhase.FEEDBACK -> dao.putCard(card.copy(phase = CardPhase.EXPLANATION.name))
+        CardPhase.FEEDBACK -> finishAndSelect(card, day)
         CardPhase.EXPLANATION -> finishAndSelect(card, day)
         CardPhase.QUESTION, CardPhase.FINISHED -> return@cardTransaction snapshotAt(day)
       }
@@ -585,7 +586,8 @@ class FlashcardRepositories(context: Context) {
     override suspend fun explain(cardId: String,
       expectedContextVersion: Long?): StudySnapshot = cardTransaction(cardId, expectedContextVersion) { day, card ->
       if (card.phase == CardPhase.FEEDBACK.name) {
-        dao.putCard(card.copy(phase = CardPhase.EXPLANATION.name))
+        // Feedback already reveals the meaning and example; avoid a second explanation page.
+        finishAndSelect(card, day)
         touch()
       }
       snapshotAt(day)

@@ -103,7 +103,8 @@ fun WordExamplePanel(example: ExampleSentence, onSpeak: (SpeechRequest) -> Unit,
   val cnSource = rememberSpeechSourceId(example.chinese to "example/cn")
   Card(modifier = Modifier.fillMaxWidth().glassPanel(shape = MaterialTheme.shapes.large),
     shape = MaterialTheme.shapes.large, colors = CardDefaults.cardColors(containerColor = glassPanelColor())) {
-    Column(Modifier.padding(if (compact) 12.dp else 16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    Column(Modifier.padding(horizontal = if (compact) 12.dp else 16.dp)
+      .padding(top = 8.dp, bottom = if (compact) 12.dp else 16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
       header?.invoke()
       Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
         Text(uiString(UiR.string.ui_example), Modifier.weight(1f),

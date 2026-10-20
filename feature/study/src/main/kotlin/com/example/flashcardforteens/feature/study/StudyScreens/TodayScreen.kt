@@ -27,6 +27,7 @@ import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
@@ -161,8 +162,8 @@ private fun TodayContent(
   val replaySourceId = rememberSpeechSourceId(state.homeWord?.id)
   val busy = state.busy || state.loading
   Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())
-    .padding(horizontal = FlashcardLayout.pageInset).padding(top = 20.dp, bottom = 28.dp),
-    verticalArrangement = Arrangement.spacedBy(20.dp)) {
+    .padding(horizontal = FlashcardLayout.pageInset).padding(top = 16.dp, bottom = 24.dp),
+    verticalArrangement = Arrangement.spacedBy(16.dp)) {
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
       horizontalArrangement = Arrangement.spacedBy(12.dp)) {
       Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -175,12 +176,26 @@ private fun TodayContent(
       EditableAvatar(state.settings.avatarId, size = 48.dp,
         accessibilityLabel = uiString(UiR.string.ui_open_profile), onClick = onProfile)
     }
-    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
-      horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-      StagePicker(stage, !busy, onStage, Modifier.weight(1f))
-      if (today != null) TextButton(onClick = onWordlist, enabled = !busy, shape = MaterialTheme.shapes.small) {
-        Text(uiString(R.string.home_words_learned, today.stageProgress.learned),
-          style = MaterialTheme.typography.labelLarge.copy(fontSize = 14.sp), maxLines = 1)
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+      Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        StagePicker(stage, !busy, onStage, Modifier.weight(1f))
+        TextButton(onClick = onWordlist, enabled = !busy, shape = MaterialTheme.shapes.small) {
+          Text(uiString(UiR.string.ui_wordlist), style = MaterialTheme.typography.labelLarge)
+        }
+      }
+      today?.stageProgress?.let { progress ->
+        val learned = progress.learned.coerceIn(0, progress.total.coerceAtLeast(0))
+        val fraction = if (progress.total > 0) learned.toFloat() / progress.total else 0f
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
+          horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+          Text(uiString(R.string.home_term_progress, learned, progress.total), Modifier.weight(1f),
+            style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+          Text(uiString(R.string.home_term_percent, (fraction * 100).toInt()),
+            style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
+        }
+        LinearProgressIndicator(progress = { fraction }, modifier = Modifier.fillMaxWidth().height(6.dp),
+          color = MaterialTheme.colorScheme.primary, trackColor = MaterialTheme.colorScheme.primaryContainer)
       }
     }
     if (today != null) {
@@ -239,8 +254,8 @@ private fun HomeStudyPanel(
     color = Color.Transparent,
     border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = .12f))) {
     Column(Modifier.background(Brush.linearGradient(listOf(MaterialTheme.colorScheme.primaryContainer,
-      MaterialTheme.colorScheme.secondaryContainer))).padding(20.dp),
-      verticalArrangement = Arrangement.spacedBy(16.dp)) {
+      MaterialTheme.colorScheme.secondaryContainer))).padding(16.dp),
+      verticalArrangement = Arrangement.spacedBy(12.dp)) {
       Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp)) {
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(5.dp)) {
@@ -419,7 +434,8 @@ private fun HomeWordShowcase(
 ) {
   Surface(Modifier.fillMaxWidth().glassPanel(), shape = MaterialTheme.shapes.large,
     color = glassPanelColor()) {
-    Column(Modifier.padding(horizontal = 20.dp, vertical = 16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+    Column(Modifier.padding(horizontal = 20.dp).padding(top = 8.dp, bottom = 16.dp),
+      verticalArrangement = Arrangement.spacedBy(8.dp)) {
       Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
         Text(uiString(UiR.string.ui_word_discovery), Modifier.weight(1f), style = MaterialTheme.typography.titleSmall,
           color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -484,6 +500,19 @@ private fun HomePreview() { HomePreviewContent(PreviewToday) }
 private fun HomeCompletePreview() {
   HomePreviewContent(PreviewToday.copy(newCompleted = PreviewToday.newPlanned,
     reviewCompleted = PreviewToday.reviewPlanned, carryoverCompleted = PreviewToday.carryoverPlanned))
+}
+
+@Preview(name = "Home · first word", widthDp = 360, heightDp = 760)
+@Composable
+private fun HomeFirstWordPreview() {
+  HomePreviewContent(PreviewToday.copy(stageProgress = PreviewToday.stageProgress.copy(learned = 0)))
+}
+
+@Preview(name = "Home · term complete", widthDp = 360, heightDp = 760)
+@Composable
+private fun HomeTermCompletePreview() {
+  HomePreviewContent(PreviewToday.copy(stageProgress = PreviewToday.stageProgress.copy(
+    learned = PreviewToday.stageProgress.total)))
 }
 
 @Composable
