@@ -20,8 +20,8 @@ CC-CEDICT 改编保留 CC BY-SA 4.0；笔顺遵守 Arphic Public License。未�
 
 ```powershell
 python tools/rebuild_wordlist.py --check
-python tools/build_wordlist_strokes.py --check
-python tools/build_demo.py --check
+python tools/build_english_resources.py --check
+python tools/build_chinese_resources.py --check
 ```
 
 这些命令的结构／再现／覆盖结果不能替代语言、版权、构建或设备验收。不要把 `--apply` 当作只读检查。

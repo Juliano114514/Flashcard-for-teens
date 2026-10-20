@@ -1,5 +1,18 @@
 # 第三方来源、许可与分发边界
 
+## Flashcard for Teens 0.0.1 当前资源
+
+当前默认库已替换为外研社三年级起点八册主题的 3,200 条英语词条。教材收录与 AI 主题拓展的来源、发音说明及审校边界保留在 CSV。新增中文拼音由本地固定工具辅助生成并复核；这些制作记录不构成教材公开再分发许可或真人认证。
+
+本版已移除汉字书写、笔顺、部件及旧美式 IPA 查询资源。保留 Kitten／Bella、Melo、ONNX 及现有头像／等级图形，各资源原许可不变。CSV 英式音标不代表现有英语音频已经改为英式。
+
+当前 CSV 引用的英式音标来自 `open-dict-data/ipa-dict/data/en_UK.txt`；固定上游 README 将该数据来源列为 leoboiko／现 melissaboiko 的 ipacards，许可为 GPL-3.0。来源、固定版本及哈希保留在 [音标来源记录](core/media/src/main/assets/english-speech/ipa-data-sources.json)，[原许可全文](core/media/src/main/assets/english-speech/licenses/IPA_EN_UK_GPL-3.0.txt) 同时并入应用内许可页。此数据不套用旧 en_US 的 MIT 声明，Kitten 和 ONNX Runtime 仍分别保留原有模型／软件许可；本次未据此作整库公开分发审核结论。
+
+以下为继承项目的历史来源记录，提到的 13,223 条中文词库、笔顺路径和旧 IPA 不属于当前英语应用打包内容，不据此为新词库认定 CC-CEDICT 授权。已保留的软件、模型和图形声明继续适用。
+
+下列记录中的“当前”及本地数据链接均指其核对日期的版本；已移除的数据及许可副本可从 Git 历史查阅。保留这些原始记录不表示本版完成了公开分发或试听验收。
+
+
 核对日期：2026-10-08。自有代码、工具代码和文档采用根目录 [MIT](LICENSE)，适用范围见 [NOTICE](NOTICE)。本文件不为第三方资源重新授权。当前完整仓库和 APK **尚未完成公开分发许可审查**，具体阻塞项见 [开源发布检查](docs/OPEN_SOURCE_COMPLIANCE.md)。
 
 ## 词库与教学数据
@@ -71,3 +84,7 @@ README 和历史 UI 文档中的产品与设计体系链接仅作设计参考说
 - Microsoft ONNX Runtime Android 沿用现有 `1.31.0`，未新增 sherpa JNI、Python 或系统语音包。jieba／pypinyin 只在构建期准备默认词库发音；导入文本使用应用内拼音解析或系统离线回退。
 
 固定 URL、SHA-256、模型准备与验证范围见 [中文语音维护](docs/MELO_TTS_EVALUATION.md)。发音旁路数据继续遵守现有教学文本的来源与许可；模型许可声明不替代未公开训练语料或声线权利的独立认证。
+
+## 学习提示音
+
+答对、答错及完成提示使用 Kenney **Interface Sounds 1.0**（2020），来源：[官方素材页](https://kenney.nl/assets/interface-sounds)，许可为 **CC0 1.0**。仅随包提供 confirmation_001.ogg、error_007.ogg、confirmation_002.ogg，未引入下载器或音频运行依赖。原始文件、来源 URL、档案与单文件 SHA-256 以及映射见 feature/study/src/main/assets/learning-sounds/NOTICE.txt，原始许可见同目录 CC0.txt，并由应用内许可页读取。
