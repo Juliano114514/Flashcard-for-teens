@@ -12,15 +12,15 @@ gradlePlugin {
   plugins {
     register("androidApplication") {
       id = "flashcard.android.application"
-      implementationClass = "com.example.chinese_flashcard.buildlogic.AndroidApplicationConventionPlugin"
+      implementationClass = "com.example.flashcardforteens.buildlogic.AndroidApplicationConventionPlugin"
     }
     register("androidLibrary") {
       id = "flashcard.android.library"
-      implementationClass = "com.example.chinese_flashcard.buildlogic.AndroidLibraryConventionPlugin"
+      implementationClass = "com.example.flashcardforteens.buildlogic.AndroidLibraryConventionPlugin"
     }
     register("androidCompose") {
       id = "flashcard.android.compose"
-      implementationClass = "com.example.chinese_flashcard.buildlogic.AndroidComposeConventionPlugin"
+      implementationClass = "com.example.flashcardforteens.buildlogic.AndroidComposeConventionPlugin"
     }
   }
 }

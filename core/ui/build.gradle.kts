@@ -4,7 +4,7 @@ plugins {
 }
 
 android {
-  namespace = "com.example.chinese_flashcard.core.ui"
+  namespace = "com.example.flashcardforteens.core.ui"
 }
 
 dependencies {

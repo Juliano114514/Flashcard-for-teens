@@ -18,6 +18,13 @@ def read_version(text):
     return name[0], int(code[0])
 
 
+def application_id(text):
+    values = re.findall(r'^\s*applicationId\s*=\s*"([A-Za-z0-9_.]+)"\s*$', text, re.M)
+    if len(values) != 1:
+        raise ValueError("Expected one applicationId")
+    return values[0]
+
+
 def release_notes(version, code):
     log = (ROOT / "VERSIONLOG.md").read_text(encoding="utf-8")
     section = re.search(rf"^## {re.escape(version)}\s+[^\n]*\n(.*?)(?=^## |\Z)", log, re.M | re.S)
@@ -27,7 +34,7 @@ def release_notes(version, code):
                         section.group(1), re.M | re.S)
     if concise:
         return concise.group(1).strip() + "\n"
-    return (f"# Chinese Flashcard {version}\n\n"
+    return (f"# Flashcard for Teens {version}\n\n"
             f"Android release APK · versionCode {code}\n\n"
             f"{section.group(1).strip()}\n\n"
             "本 Release 的 APK 由 GitHub Actions 编译、签名并校验；"
@@ -38,7 +45,8 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--notes", type=Path)
     args = parser.parse_args()
-    version, code = read_version((ROOT / VERSION_FILE).read_text(encoding="utf-8"))
+    current = (ROOT / VERSION_FILE).read_text(encoding="utf-8")
+    version, code = read_version(current)
     if args.notes:
         args.notes.write_text(release_notes(version, code), encoding="utf-8")
         return
@@ -57,7 +65,12 @@ def main():
             check=True, text=True, capture_output=True,
         ).stdout
         old_version, old_code = read_version(previous)
-        if (version, code) != (old_version, old_code):
+        if application_id(previous) != application_id(current):
+            # This is a distinct installed application, with an explicitly reset baseline.
+            # CI still validates it; publishing its first Release requires manual intent.
+            if application_id(current) != "com.example.flashcardforteens" or (version, code) != ("0.0.1", 1):
+                raise ValueError("Unexpected application identity/version reset")
+        elif (version, code) != (old_version, old_code):
             if (tuple(map(int, version.split("."))) <= tuple(map(int, old_version.split(".")))
                     or code <= old_code):
                 raise ValueError("A release must increase both versionName and versionCode")

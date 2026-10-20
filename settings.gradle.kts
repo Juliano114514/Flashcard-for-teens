@@ -23,7 +23,7 @@ dependencyResolutionManagement {
   }
 }
 
-rootProject.name = "Chinese_Flashcard"
+rootProject.name = "Flashcard for Teens"
 include(":app", ":core:domain", ":core:data", ":core:ui", ":core:media")
-include(":feature:study", ":feature:profile", ":feature:writing", ":feature:wordlist")
+include(":feature:study", ":feature:profile", ":feature:wordlist")
  

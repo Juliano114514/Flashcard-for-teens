@@ -1,0 +1,36 @@
+<resources>
+    <string name="home_greeting">你好，%1$s</string>
+    <string name="home_friend">小伙伴</string>
+    <string name="home_words_learned">已会 %1$d 词</string>
+    <string name="home_goal_complete">目标完成啦！</string>
+    <string name="home_goal_remaining">再学 %1$d 个词</string>
+    <string name="home_goal_first">从第一个单词开始</string>
+    <string name="home_start_review">开始复习</string>
+    <string name="home_review_more">再复习几个</string>
+    <string name="home_review_count">再复习 %1$d 词</string>
+    <string name="home_start_learning">开始学习</string>
+    <string name="home_stage_complete">本学期已学完</string>
+    <string name="home_pick_up_word">接着上次学</string>
+    <string name="home_words_remaining">还有 %1$d 个词</string>
+    <string name="home_add_words">再学 %1$d 个词</string>
+    <string name="home_finish_review">先完成复习</string>
+    <string name="home_finish_carryover">先学完上次</string>
+    <string name="home_finish_current">先完成当前词</string>
+    <string name="home_all_learned">本学期已学完</string>
+    <string name="home_review_words">复习单词</string>
+    <string name="home_word_count">%1$d 个词</string>
+    <string name="home_choose_book">选择你的课本</string>
+    <string name="home_grade">%1$d 年级</string>
+    <string name="home_first_term">上册</string>
+    <string name="home_second_term">下册</string>
+    <string name="welcome_title">一起认识新单词</string>
+    <string name="welcome_subtitle">准备一下，马上开始</string>
+    <string name="welcome_name">你的名字</string>
+    <string name="welcome_name_placeholder">怎么称呼你？</string>
+    <string name="welcome_daily_title">每天学几个新词？</string>
+    <string name="welcome_daily_hint">推荐 10 个，轻松养成习惯</string>
+    <string name="welcome_review_title">隔几天再复习？</string>
+    <string name="welcome_review_hint">可以多选，帮你安排复习</string>
+    <string name="welcome_review_day">%1$d 天后</string>
+    <string name="welcome_settings_hint">以后也可以在「我的」里调整</string>
+</resources>

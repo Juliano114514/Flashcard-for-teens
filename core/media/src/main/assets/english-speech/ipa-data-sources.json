@@ -1,0 +1,19 @@
+{
+  "attributionEvidence": {
+    "bytes": 15495,
+    "sha256": "7251a8159f6d1d1a981ae5e79e616e3c7181950c1b6023042a727056a47e87a0",
+    "url": "https://raw.githubusercontent.com/open-dict-data/ipa-dict/43c3570eb3553bdd19fccd2bd0091534889af023/README.md"
+  },
+  "dataLicense": "GPL-3.0",
+  "dataset": "open-dict-data/ipa-dict en_UK (Received Pronunciation)",
+  "legacyLookupTableBundled": false,
+  "licenseAsset": "english-speech/licenses/IPA_EN_UK_GPL-3.0.txt",
+  "licenseSource": {
+    "bytes": 35147,
+    "sha256": "8ceb4b9ee5adedde47b31e975c1d90c73ad27b6b165a1dcd80c7c545eb65b903",
+    "url": "https://raw.githubusercontent.com/melissaboiko/ipacards/ac25f24df0712562b3c4762e21880fced2ae0b92/LICENSE"
+  },
+  "schemaVersion": 1,
+  "scope": "CSV British IPA reference attribution; not a whole-CSV license certification",
+  "upstreamCredit": "ipacards by @leoboiko (upstream now @melissaboiko)"
+}

@@ -1,16 +1,16 @@
 #!/usr/bin/env python3
-"""Prepare or verify frozen English teaching/speech assets without changing the CSV.
+"""Prepare or verify English headword/example/chunk speech without changing CSV.
 
 --prepare explicitly downloads fixed, checksum-locked sources to .gradle only.
 --build uses those sources and a build-time eSpeak DLL; --check is offline/read-only
-and needs only the Python standard library. --refresh-teaching updates provenance
-indices/licenses from existing assets without downloading or loading native code.
+and needs only the Python standard library. --refresh-index updates the CSV IPA/
+word-ID index. --refresh-licenses updates notices/full license copies and their
+byte counts without token regeneration, downloading or loading native code.
 No GPL code or NPZ is copied to assets.
 """
 from __future__ import annotations
 
 import argparse
-import csv
 import ctypes
 import hashlib
 import importlib.util
@@ -28,17 +28,26 @@ ROOT = Path(__file__).resolve().parents[1]
 CACHE = ROOT / ".gradle" / "english-resource-source"
 LOCK = ROOT / "tools" / "english_resources" / "source-lock.json"
 SPEECH = ROOT / "core" / "media" / "src" / "main" / "assets" / "english-speech"
-TEACHING = ROOT / "core" / "data" / "src" / "main" / "assets" / "english-teaching"
 CSV = ROOT / "wordlist.csv"
 MODEL_REVISION = "84781d74e29ee25217551556398b42f80593a813"
 KITTEN_CODE_REVISION = "8ed679c08e0976b236bd5d0dc4ec9ddd98b0da98"
-IPA_REVISION = "43c3570eb3553bdd19fccd2bd0091534889af023"
 VOICE = "expr-voice-2-f"
 MODEL_NAME = "kitten-nano-0.8-int8.onnx"
 STYLE_NAME = "bella.f32"
 STYLE_SHA256 = "0f56274d033abbb4103140ff346e4f343c31dd0d2d3a45269a0988245291330e"
 MAX_SOURCE_BYTES = 64 * 1024 * 1024
 MAX_TOKEN_COUNT = 510
+LICENSE_NAMES = ("KITTEN_APACHE-2.0.txt", "ORT_MIT.txt", "IPA_EN_UK_GPL-3.0.txt")
+IPA_DATA_NOTICE = (
+    "CSV British IPA data attribution (separate from speech model/runtime licenses)\n"
+    "British IPA references retained in the CSV include open-dict-data/ipa-dict en_UK (Received Pronunciation).\n"
+    "Its fixed README credits the English (UK) data to ipacards by @leoboiko (upstream now @melissaboiko), GPL 3.0.\n"
+    "Sources: https://github.com/open-dict-data/ipa-dict ; https://github.com/melissaboiko/ipacards .\n"
+    "The ipa-dict repository's general MIT statement does not override this third-party data license.\n"
+    "This notice preserves attribution for the IPA reference data; it does not relicense Kitten (Apache-2.0), "
+    "ONNX Runtime (MIT), or the entire mixed-source CSV. No legacy IPA lookup table is bundled.\n"
+    "Fixed source URLs, revisions and SHA-256 are retained in english-speech/ipa-data-sources.json.\n"
+)
 PUNCTUATION = ';:,.!?¡¿—…"«»“”()[]{}'
 SYMBOLS = (
     "$" + ';:,.!?¡¿—…"«»"" ' + "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
@@ -55,11 +64,19 @@ def text_hash(text: str) -> str:
     return sha256(text.strip().encode("utf-8"))
 
 
+def pronunciation_text(text: str) -> str:
+    # Apply before Kitten lowercases the title to the ambiguous abbreviation "ms".
+    # Display text, wordlist bytes and speech lookup keys remain unchanged.
+    return re.sub(r"\b(?:Ms|MS)\.?(?!\w)", "miz", text)
+
+
 def write_json(path: Path, value: object, *, pretty: bool = False) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(value, ensure_ascii=False, sort_keys=True,
-        indent=2 if pretty else None, separators=None if pretty else (",", ":")) + "\n",
-        encoding="utf-8", newline="\n")
+    payload = (json.dumps(value, ensure_ascii=False, sort_keys=True,
+        indent=2 if pretty else None, separators=None if pretty else (",", ":")) + "\n").encode("utf-8")
+    temporary = path.with_name(path.name + ".part")
+    temporary.write_bytes(payload)
+    temporary.replace(path)
 
 
 def split_meanings(text: str) -> list[str]:
@@ -101,20 +118,15 @@ def collect_texts() -> tuple[list[str], dict[str, int], int]:
             texts.update(fragment for fragment in split_meanings(text)
                 if any(character.isalnum() for character in fragment))
 
-    with CSV.open(encoding="utf-8-sig", newline="") as source:
-        rows = list(csv.DictReader(source))
-    for row in rows:
-        add(row["英文释义"], "primary", split=True)
-        for column, category in (("本义解释JSON", "literal"), ("引申义解释JSON", "figurative")):
-            for meaning in json.loads(row[column]):
-                add(meaning, category, split=True)
-        for part in json.loads(row["部件JSON"]):
-            add(part["gloss"], "part", split=True)
+    from english_wordlist import rows
+    vocabulary = rows()
+    for row in vocabulary:
+        add(row["英语词条"], "headword")
         for sentence in json.loads(row["例句JSON"]):
             add(sentence["english"], "sentence")
             for chunk in sentence["chunks"]:
-                add(chunk["gloss"], "sentenceChunk", split=True)
-    return sorted(texts), counts, len(rows)
+                add(chunk["english"], "sentenceChunk")
+    return sorted(texts), counts, len(vocabulary)
 
 
 def primary_senses(text: str) -> list[str]:
@@ -137,24 +149,17 @@ def primary_senses(text: str) -> list[str]:
     return result
 
 
-def word_index(ipa_entries: dict[str, str], speech_keys: set[str]) -> dict:
+def word_index(speech_keys: set[str]) -> dict:
+    from english_wordlist import rows
     entries = {}
-    with CSV.open(encoding="utf-8-sig", newline="") as source:
-        for row in csv.DictReader(source):
-            word_id = row["词条ID"]
-            if word_id in entries:
-                raise ValueError("Duplicate source word ID")
-            senses = []
-            for text in primary_senses(row["英文释义"]):
-                key = text_hash(text)
-                is_spoken = any(character.isalnum() for character in text)
-                if is_spoken and key not in speech_keys:
-                    raise ValueError(f"Primary sense has no existing speech tokens: {word_id}")
-                senses.append({"text": text, "speechHash": key if is_spoken else None,
-                    "ipaKey": text.lower() if text.lower() in ipa_entries else None})
-            entries[word_id] = {"primaryGloss": row["英文释义"], "senses": senses}
+    for row in rows():
+        key = text_hash(row["英语词条"])
+        if key not in speech_keys:
+            raise ValueError(f"Headword has no speech tokens: {row['词条ID']}")
+        entries[row["词条ID"]] = {"headword": row["英语词条"], "ipa": row["音标"], "speechHash": key}
     return {"schemaVersion": 1, "sourceWordlistSha256": sha256(CSV.read_bytes()),
-        "wordCount": len(entries), "entries": entries}
+        "wordCount": len(entries), "ipaSource": "CSV British IPA; never generated by TTS",
+        "speechDialect": "existing Bella voice with en-US phonemization", "entries": entries}
 
 
 def refresh_teaching() -> None:
@@ -165,32 +170,61 @@ def refresh_teaching() -> None:
     speech_keys: set[str] = set()
     for filename in speech_manifest["shards"]:
         speech_keys.update(json.loads((SPEECH / filename).read_text(encoding="utf-8"))["entries"])
-    ipa_entries = json.loads((TEACHING / "ipa.json").read_text(encoding="utf-8"))["entries"]
-    write_json(TEACHING / "word-index.json", word_index(ipa_entries, speech_keys))
-    license_names = ["IPA_MIT.txt", "CMUDICT_BSD.txt", "CMUDICT_IPA_MIT.txt", "SYLLABIFY_MIT.txt"]
-    sections = [
-        "English IPA teaching data: sources and licenses\n\n"
-        "ipa-dict en_US; fixed revision " + IPA_REVISION + ".\n"
-        "Source: https://github.com/open-dict-data/ipa-dict\n"
-        "US IPA data is based on cmudict-ipa by lingz, CMUdict by Carnegie Mellon University, "
-        "and syllabify by Kyle Gorman.\n"
-        "Processing: exact lowercase lookup for the current wordlist, with original IPA variants retained.\n"
-        "The word-ID provenance index reproduces existing English teaching text; "
-        "it retains the wordlist's existing mixed-source licensing and does not relicense it.\n",
-    ]
-    for name in license_names:
-        sections.append("\n\n" + name + "\n\n" + (TEACHING / "licenses" / name).read_text(encoding="utf-8"))
-    (TEACHING / "LICENSES.txt").write_text("".join(sections), encoding="utf-8", newline="\n")
-    source_path = TEACHING / "sources.json"
-    provenance = json.loads(source_path.read_text(encoding="utf-8"))
-    provenance["sourceWordlistSha256"] = speech_manifest["sourceWordlistSha256"]
-    provenance["generatedFiles"] = {name: {"sha256": sha256((TEACHING / name).read_bytes()),
-        "bytes": (TEACHING / name).stat().st_size} for name in ("ipa.json", "word-index.json", "LICENSES.txt")}
-    write_json(source_path, provenance, pretty=True)
+    write_json(SPEECH / "word-index.json", word_index(speech_keys))
 
 
 def source_lock() -> dict[str, dict]:
     return json.loads(LOCK.read_text(encoding="utf-8"))
+
+
+def ipa_data_sources() -> dict:
+    locked = source_lock()
+    return {"schemaVersion": 1, "scope": "CSV British IPA reference attribution; not a whole-CSV license certification",
+        "dataset": "open-dict-data/ipa-dict en_UK (Received Pronunciation)",
+        "upstreamCredit": "ipacards by @leoboiko (upstream now @melissaboiko)", "dataLicense": "GPL-3.0",
+        "attributionEvidence": locked["IPA_README.md"], "licenseSource": locked["IPA_EN_UK_GPL-3.0.txt"],
+        "licenseAsset": "english-speech/licenses/IPA_EN_UK_GPL-3.0.txt", "legacyLookupTableBundled": False}
+
+
+def refresh_licenses() -> None:
+    """Update only notices/full license copies, without phonemization or CSV edits."""
+    locked = source_lock()
+    for name in (*LICENSE_NAMES, "IPA_README.md"):
+        payload = (CACHE / name).read_bytes()
+        if len(payload) != locked[name]["bytes"] or sha256(payload) != locked[name]["sha256"]:
+            raise ValueError(f"Changed license/attribution source: {name}")
+    readme = (CACHE / "IPA_README.md").read_text(encoding="utf-8")
+    if "English (UK) IPA data derived from" not in readme or "[GPL 3.0]" not in readme:
+        raise ValueError("The fixed README no longer declares the recorded en_UK provenance")
+    (SPEECH / "licenses").mkdir(parents=True, exist_ok=True)
+    for name in LICENSE_NAMES:
+        shutil.copyfile(CACHE / name, SPEECH / "licenses" / name)
+    write_json(SPEECH / "ipa-data-sources.json", ipa_data_sources(), pretty=True)
+    combined = (
+        "English speech model and inference runtime\n\n"
+        "KittenML Kitten TTS Nano 0.8 INT8: Apache-2.0; fixed model revision " + MODEL_REVISION + ".\n"
+        "Model/style conversion retains one Bella voice; no training or voice cloning.\n"
+        "The English text/token sidecar retains the existing wordlist's mixed-source licensing; "
+        "the model license does not relicense those texts.\n"
+        "Microsoft ONNX Runtime Android 1.31.0: MIT.\n"
+        "eSpeak NG is a build-time tool only; its code and language data are absent from these assets.\n\n"
+        + (CACHE / "KITTEN_APACHE-2.0.txt").read_text(encoding="utf-8")
+        + "\n\nMicrosoft ONNX Runtime license\n\n" + (CACHE / "ORT_MIT.txt").read_text(encoding="utf-8")
+        + "\n\n" + IPA_DATA_NOTICE + "\n" + (CACHE / "IPA_EN_UK_GPL-3.0.txt").read_text(encoding="utf-8"))
+    (SPEECH / "LICENSES.txt").write_text(combined, encoding="utf-8", newline="\n")
+
+
+def write_coverage(report: dict) -> None:
+    coverage_path = SPEECH / "coverage.json"
+    other_bytes = sum(path.stat().st_size for path in SPEECH.rglob("*") if path.is_file() and path != coverage_path)
+    for _ in range(5):
+        payload = (json.dumps(report, ensure_ascii=False, indent=2, sort_keys=True) + "\n").encode("utf-8")
+        total = other_bytes + len(payload)
+        if report["speechAssetBytes"] == total:
+            coverage_path.write_bytes(payload)
+            return
+        report["speechAssetBytes"] = total
+    raise ValueError("English coverage byte size did not converge")
 
 
 def verify_sources() -> None:
@@ -308,9 +342,7 @@ def build() -> None:
     verify_sources()
     verify_native_tool()
     SPEECH.mkdir(parents=True, exist_ok=True)
-    TEACHING.mkdir(parents=True, exist_ok=True)
-    for target in (SPEECH / "licenses", TEACHING / "licenses"):
-        target.mkdir(parents=True, exist_ok=True)
+    (SPEECH / "licenses").mkdir(parents=True, exist_ok=True)
     config = json.loads((CACHE / "config.json").read_text(encoding="utf-8"))
     with np.load(CACHE / "voices.npz", allow_pickle=False) as voices:
         style = np.asarray(voices[VOICE], dtype="<f4")
@@ -318,28 +350,8 @@ def build() -> None:
         raise ValueError("Unexpected Bella voice data")
     (SPEECH / STYLE_NAME).write_bytes(style.tobytes(order="C"))
     shutil.copyfile(CACHE / "kitten_tts_nano_v0_8.onnx", SPEECH / MODEL_NAME)
-    shutil.copyfile(CACHE / "KITTEN_APACHE-2.0.txt", SPEECH / "licenses" / "KITTEN_APACHE-2.0.txt")
-    shutil.copyfile(CACHE / "ORT_MIT.txt", SPEECH / "licenses" / "ORT_MIT.txt")
-    (SPEECH / "LICENSES.txt").write_text(
-        "English speech model and inference runtime\n\n"
-        "KittenML Kitten TTS Nano 0.8 INT8: Apache-2.0; fixed model revision " + MODEL_REVISION + ".\n"
-        "Model/style conversion retains one Bella voice; no training or voice cloning.\n"
-        "The English text/token sidecar retains the existing wordlist's mixed-source licensing; "
-        "the model license does not relicense those texts.\n"
-        "Microsoft ONNX Runtime Android 1.31.0: MIT.\n"
-        "eSpeak NG is a build-time tool only; its code and language data are absent from these assets.\n\n"
-        + (CACHE / "KITTEN_APACHE-2.0.txt").read_text(encoding="utf-8")
-        + "\n\nMicrosoft ONNX Runtime license\n\n"
-        + (CACHE / "ORT_MIT.txt").read_text(encoding="utf-8"), encoding="utf-8", newline="\n")
+    refresh_licenses()
     shutil.copyfile(CACHE / "MODEL_README.md", SPEECH / "MODEL_README.md")
-    for name in ("IPA_MIT.txt", "CMUDICT_BSD.txt", "CMUDICT_IPA_MIT.txt"):
-        shutil.copyfile(CACHE / name, TEACHING / "licenses" / name)
-    # Upstream embeds this complete license in the first 21 source lines.
-    license_lines = (CACHE / "SYLLABIFY_SOURCE.py").read_text(encoding="utf-8").splitlines()[1:21]
-    (TEACHING / "licenses" / "SYLLABIFY_MIT.txt").write_text(
-        "\n".join(line.removeprefix("# ").removeprefix("#") for line in license_lines) + "\n",
-        encoding="utf-8", newline="\n")
-    shutil.copyfile(CACHE / "IPA_README.md", TEACHING / "IPA_README.md")
     spec = importlib.util.spec_from_file_location("frozen_kitten_preprocess", CACHE / "kitten_preprocess.py")
     if spec is None or spec.loader is None:
         raise RuntimeError("Cannot load checksum-verified text preprocessor")
@@ -355,7 +367,7 @@ def build() -> None:
     try:
         for index, text in enumerate(texts):
             chunks = []
-            for chunk in preprocessor.chunk_text(normalize(text)):
+            for chunk in preprocessor.chunk_text(normalize(pronunciation_text(text))):
                 # An abbreviation followed by a closing parenthesis may leave a
                 # punctuation-only tail. It has no speech and needs no model call.
                 if not any(character.isalnum() for character in chunk):
@@ -386,17 +398,6 @@ def build() -> None:
         write_json(path, {"schemaVersion": 1, "entries": entries})
         shard_files[path.name] = {"sha256": sha256(path.read_bytes()), "bytes": path.stat().st_size,
             "entries": len(entries)}
-    dictionary = {}
-    for line in (CACHE / "ipa_en_US.txt").read_text(encoding="utf-8").splitlines():
-        word, ipa = line.split("\t", 1)
-        dictionary[word] = ipa
-    ipa_entries = {text.lower(): dictionary[text.lower()] for text in texts if text.lower() in dictionary}
-    write_json(TEACHING / "ipa.json", {"schemaVersion": 1, "dialect": "en-US", "entries": ipa_entries})
-    write_json(TEACHING / "sources.json", {"schemaVersion": 1,
-        "revision": IPA_REVISION, "url": "https://github.com/open-dict-data/ipa-dict",
-        "dataSha256": source_lock()["ipa_en_US.txt"]["sha256"],
-        "processing": "Exact lowercase lookup of current English texts; no generated or guessed IPA.",
-        "licenses": ["licenses/IPA_MIT.txt", "licenses/CMUDICT_BSD.txt", "licenses/CMUDICT_IPA_MIT.txt", "licenses/SYLLABIFY_MIT.txt"]}, pretty=True)
     manifest = {"schemaVersion": 1, "modelPath": f"english-speech/{MODEL_NAME}",
         "stylePath": f"english-speech/{STYLE_NAME}", "styleRows": 400, "styleColumns": 256,
         "sampleRate": 24000, "speedPrior": config["speed_priors"][VOICE], "trimTailSamples": 5000,
@@ -412,16 +413,16 @@ def build() -> None:
     report = {"schemaVersion": 1, "wordCount": word_count, "sourceWordlistSha256": manifest["sourceWordlistSha256"],
         "uniqueSpeechTexts": len(texts), "speechChunks": chunk_count, "missingSpeechTexts": 0,
         "sourceCategoryOccurrences": categories, "maximumTokenCount": max_tokens,
-        "ipaExactMatches": len(ipa_entries), "ipaMissingTexts": len(texts) - len(ipa_entries),
+        "ipaSource": "CSV British IPA; speech keeps existing en-US Bella voice",
         "ignoredNonModelSymbols": ignored_symbols, "buildTimeEspeakVersion": phonemizer.version,
         "runtimeGplCodeBundled": False, "runtimeNpzBundled": False,
         "speechAssetBytes": sum(path.stat().st_size for path in SPEECH.rglob("*") if path.is_file()),
         "limitations": ["Static resource checks do not prove Android audio, latency, or pronunciation quality.",
             "Imported English texts absent from this frozen sidecar require a device-provided offline English voice.",
-            "IPA exact dictionary matches retain multiple pronunciations and are not context-disambiguated.",
+            "Displayed British IPA does not change the retained Bella voice.",
             "Model license declarations do not establish training-data or voice rights beyond their stated grant."]}
-    write_json(SPEECH / "coverage.json", report, pretty=True)
     refresh_teaching()
+    write_coverage(report)
     print(json.dumps(report, ensure_ascii=False, indent=2))
     check()
 
@@ -443,6 +444,7 @@ def check() -> None:
             math.isfinite(item[0]) for item in struct.iter_unpack("<f", style_bytes)):
         raise ValueError("Invalid raw float32 voice style")
     present: set[str] = set()
+    chunk_count, maximum_tokens = 0, 0
     for filename, expected in manifest["shards"].items():
         path = SPEECH / filename
         data = path.read_bytes()
@@ -459,49 +461,43 @@ def check() -> None:
                 raise ValueError("Empty speech chunks")
             for chunk in entry["chunks"]:
                 tokens = chunk["tokenIds"]
+                chunk_count += 1
+                maximum_tokens = max(maximum_tokens, len(tokens))
                 if not (3 < len(tokens) <= MAX_TOKEN_COUNT and tokens[0] == 0 and tokens[-2:] == [10, 0]
                         and all(type(token) is int and 0 <= token < len(SYMBOLS) for token in tokens)
                         and type(chunk["styleRow"]) is int and 0 <= chunk["styleRow"] < manifest["styleRows"]):
                     raise ValueError("Invalid token/style data")
-    texts, _, word_count = collect_texts()
+    texts, categories, word_count = collect_texts()
     if present != {text_hash(text) for text in texts}:
         raise ValueError("Frozen English speech coverage mismatch")
-    ipa = json.loads((TEACHING / "ipa.json").read_text(encoding="utf-8"))
-    if ipa["schemaVersion"] != 1 or ipa["dialect"] != "en-US" or not all(
-            key == key.lower() and value.startswith("/") and value.endswith("/")
-            for key, value in ipa["entries"].items()):
-        raise ValueError("Invalid dictionary IPA entries")
-    index = json.loads((TEACHING / "word-index.json").read_text(encoding="utf-8"))
-    if index != word_index(ipa["entries"], present) or index["wordCount"] != word_count:
-        raise ValueError("Word-ID provenance index differs from the original CSV or speech/IPA resources")
-    teaching_sources = json.loads((TEACHING / "sources.json").read_text(encoding="utf-8"))
-    if teaching_sources["sourceWordlistSha256"] != manifest["sourceWordlistSha256"]:
-        raise ValueError("Teaching source wordlist snapshot mismatch")
-    for filename in ("ipa.json", "word-index.json", "LICENSES.txt"):
-        expected = teaching_sources["generatedFiles"][filename]
-        data = (TEACHING / filename).read_bytes()
-        if sha256(data) != expected["sha256"] or len(data) != expected["bytes"]:
-            raise ValueError(f"Teaching asset checksum mismatch: {filename}")
-    for root in (SPEECH, TEACHING):
+    index = json.loads((SPEECH / "word-index.json").read_text(encoding="utf-8"))
+    if index != word_index(present) or index["wordCount"] != word_count:
+        raise ValueError("Word-ID speech/CSV IPA index differs from the protected CSV")
+    for root in (SPEECH,):
         for path in root.rglob("*"):
             if path.is_file() and path.suffix.lower() in {".npz", ".npy", ".dll", ".so", ".py", ".whl"}:
                 raise ValueError("Build-only native code or unsafe-format source found in assets")
-    for root, names in ((SPEECH, ["KITTEN_APACHE-2.0.txt", "ORT_MIT.txt"]),
-            (TEACHING, ["IPA_MIT.txt", "CMUDICT_BSD.txt", "CMUDICT_IPA_MIT.txt", "SYLLABIFY_MIT.txt"])):
+    for root, names in ((SPEECH, LICENSE_NAMES),):
         if any(not (root / "licenses" / name).is_file() for name in names):
             raise ValueError("Missing redistribution license")
         for name in names:
-            if name in source_lock() and sha256((root / "licenses" / name).read_bytes()) != source_lock()[name]["sha256"]:
+            if (sha256((root / "licenses" / name).read_bytes()) != source_lock()[name]["sha256"]
+                    or (root / "licenses" / name).stat().st_size != source_lock()[name]["bytes"]):
                 raise ValueError("Changed redistribution license")
     combined = (SPEECH / "LICENSES.txt").read_text(encoding="utf-8")
     if any((SPEECH / "licenses" / name).read_text(encoding="utf-8") not in combined
-            for name in ("KITTEN_APACHE-2.0.txt", "ORT_MIT.txt")):
+            for name in LICENSE_NAMES) or IPA_DATA_NOTICE not in combined:
         raise ValueError("Incomplete combined speech licenses")
-    teaching_combined = (TEACHING / "LICENSES.txt").read_text(encoding="utf-8")
-    if any((TEACHING / "licenses" / name).read_text(encoding="utf-8") not in teaching_combined
-            for name in ("IPA_MIT.txt", "CMUDICT_BSD.txt", "CMUDICT_IPA_MIT.txt", "SYLLABIFY_MIT.txt")):
-        raise ValueError("Incomplete combined teaching licenses")
-    print(f"English resource check passed: {word_count} words, {len(present)} speech texts, {len(ipa['entries'])} exact IPA entries.")
+    if json.loads((SPEECH / "ipa-data-sources.json").read_text(encoding="utf-8")) != ipa_data_sources():
+        raise ValueError("British IPA attribution source identity changed")
+    coverage = json.loads((SPEECH / "coverage.json").read_text(encoding="utf-8"))
+    expected_coverage = {"wordCount": word_count, "sourceWordlistSha256": manifest["sourceWordlistSha256"],
+        "uniqueSpeechTexts": len(present), "speechChunks": chunk_count, "missingSpeechTexts": 0,
+        "sourceCategoryOccurrences": categories, "maximumTokenCount": maximum_tokens,
+        "speechAssetBytes": sum(path.stat().st_size for path in SPEECH.rglob("*") if path.is_file())}
+    if any(coverage.get(key) != value for key, value in expected_coverage.items()):
+        raise ValueError("English coverage counts or final resource byte size are stale")
+    print(f"English resource check passed: {word_count} words, {len(present)} speech texts; CSV IPA preserved.")
 
 
 def main() -> None:
@@ -511,12 +507,18 @@ def main() -> None:
     actions.add_argument("--build", action="store_true")
     actions.add_argument("--check", action="store_true")
     actions.add_argument("--refresh-teaching", action="store_true")
+    actions.add_argument("--refresh-index", action="store_true")
+    actions.add_argument("--refresh-licenses", action="store_true")
     arguments = parser.parse_args()
     if arguments.prepare:
         prepare()
     elif arguments.build:
         build()
-    elif arguments.refresh_teaching:
+    elif arguments.refresh_licenses:
+        refresh_licenses()
+        write_coverage(json.loads((SPEECH / "coverage.json").read_text(encoding="utf-8")))
+        check()
+    elif arguments.refresh_teaching or arguments.refresh_index:
         refresh_teaching()
         check()
     else:

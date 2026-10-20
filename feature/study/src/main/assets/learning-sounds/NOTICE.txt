@@ -1,0 +1,26 @@
+Learning feedback sounds
+
+Source: Kenney, Interface Sounds 1.0
+Asset page: https://kenney.nl/assets/interface-sounds
+Archive: https://kenney.nl/media/pages/assets/interface-sounds/fa43c1dd4d-1677589452/kenney_interface-sounds.zip
+Downloaded and verified: 2026-10-20
+Archive SHA-256: f2193d072726d6758a5f7871b2dcc54dcce0d5c35c6f0a62f92549b327c81232
+License: Creative Commons Zero 1.0 (CC0)
+License URL: https://creativecommons.org/publicdomain/zero/1.0/
+The unmodified upstream License.txt is preserved beside this notice as CC0.txt.
+
+Only these three audio files are bundled. Audio bytes are unchanged; filenames
+are mapped to Android resource names. No third-party characters or trademarks
+are included in the learning interface.
+
+Audio/confirmation_001.ogg -> res/raw/learning_correct.ogg
+SHA-256: 063564703b6094d70718a3e787a55cc9141611e4ecd6b6637f8828f79b4a8c3a
+Duration: 290 ms
+
+Audio/error_007.ogg -> res/raw/learning_try_again.ogg
+SHA-256: f1ee4c1ac8bfe1a82eacb54b26f49e8974bab93bcf10c01800bc10dbf730f559
+Duration: 192 ms
+
+Audio/confirmation_002.ogg -> res/raw/learning_complete.ogg
+SHA-256: 33b17a9a9a2397c62b285c52c33a907fdffb476909c99e42dde603f6a7a8b12c
+Duration: 539 ms

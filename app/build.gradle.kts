@@ -4,12 +4,12 @@ plugins {
 }
 
 android {
-  namespace = "com.example.chinese_flashcard"
+  namespace = "com.example.flashcardforteens"
   defaultConfig {
-    applicationId = "com.example.chinese_flashcard"
+    applicationId = "com.example.flashcardforteens"
     targetSdk = 36
-    versionCode = 17
-    versionName = "1.6.3"
+    versionCode = 5
+    versionName = "0.0.5"
 
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
   }
@@ -35,7 +35,6 @@ dependencies {
   implementation(project(":core:ui"))
   implementation(project(":feature:study"))
   implementation(project(":feature:profile"))
-  implementation(project(":feature:writing"))
   implementation(project(":feature:wordlist"))
   implementation(platform(libs.compose.bom))
   implementation(libs.compose.material3)

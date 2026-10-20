@@ -7,7 +7,6 @@ assets after SHA-256 verification. --check is standard-library-only and offline.
 from __future__ import annotations
 
 import argparse
-import csv
 import hashlib
 import json
 from pathlib import Path
@@ -16,35 +15,34 @@ import shutil
 import unicodedata
 
 import evaluate_melo_tts as audition
+from english_wordlist import rows as vocabulary_rows
 
 ROOT = audition.ROOT
 ASSETS = ROOT / "core" / "media" / "src" / "main" / "assets" / "chinese-speech"
+CSV_SHA256 = audition.digest(audition.CSV)
 
 
 def canonical(value: str) -> str:
     return unicodedata.normalize("NFC", value.strip().lower())
 
 
-def reading_key(text: str, pinyin: str, chunks: list[dict] | None = None) -> str:
-    suffix = "\x1f".join(chunk["hanzi"] + "\x1e" + canonical(chunk["pinyin"]) for chunk in chunks or [])
-    return hashlib.sha256((text.strip() + "\n" + canonical(pinyin) + "\n" + suffix).encode("utf-8")).hexdigest()
+def reading_key(text: str, pinyin: str) -> str:
+    # Keep the empty final component for existing reviewed short-word recordings.
+    return hashlib.sha256((text.strip() + "\n" + canonical(pinyin) + "\n").encode("utf-8")).hexdigest()
 
 
 def readings() -> list[dict]:
     result = {}
-    for row in audition.rows():
-        for text, pinyin, chunks, category in [(row["组词"], row["拼音"], None, "word")] + [
-            (example["hanzi"], example["pinyin"], example["chunks"], "example")
-            for example in json.loads(row["例句JSON"])]:
-            entry = {"text": text, "pinyin": pinyin}
-            if chunks:
-                entry["chunks"] = [{"hanzi": chunk["hanzi"], "pinyin": chunk["pinyin"]} for chunk in chunks]
-            result[reading_key(text, pinyin, chunks)] = entry
-        syllables = re.split(r"[\s'’\-]+", row["拼音"].strip())
-        characters = list(row["组词"])
-        if len(characters) == len(syllables):
-            for character, syllable in zip(characters, syllables, strict=True):
-                result[reading_key(character, syllable)] = {"text": character, "pinyin": syllable}
+    for row in vocabulary_rows():
+        applications = [(row["中文释义"], row["中文释义拼音"], "definition")]
+        for index, example in enumerate(json.loads(row["例句JSON"])):
+            applications.append((example["chinese"], example["chinesePinyin"], f"example[{index}]"))
+            for part, chunk in enumerate(example["chunks"]):
+                applications.append((chunk["chinese"], chunk["chinesePinyin"], f"example[{index}].chunk[{part}]"))
+        for text, pinyin, field in applications:
+            key = reading_key(text, pinyin)
+            entry = result.setdefault(key, {"text": text, "pinyin": pinyin, "sources": []})
+            entry["sources"].append({"id": row["词条ID"], "field": field})
     return [dict(entry, key=key) for key, entry in sorted(result.items())]
 
 
@@ -88,7 +86,8 @@ def build() -> None:
     for index, reading in enumerate(readings(), 1):
         key = reading.pop("key")
         try:
-            compiled = compile_reading(reading["text"], reading["pinyin"], reading.get("chunks"))
+            # English-order Chinese teaching chunks never reconstruct the natural sentence.
+            compiled = compile_reading(reading["text"], reading["pinyin"])
             if not 1 <= len(compiled["phoneIds"]) <= 510:
                 raise UnsupportedReading("Raw phone count is outside the model input bound")
             reading.update({"phoneIds": compiled["phoneIds"], "tones": compiled["tones"]})
@@ -118,30 +117,36 @@ def build() -> None:
         encoding="utf-8", newline="\n")
     manifest = {"schemaVersion": 1, "engine": "melo-vits", "modelRevision": audition.MODEL_REVISION,
         "modelPath": "chinese-speech/model.onnx", "modelBytes": source_lock["sources"]["model.onnx"]["bytes"],
-        "modelSha256": audition.MODEL_SHA256, "sourceWordlistSha256": audition.CSV_SHA256,
+        "modelSha256": audition.MODEL_SHA256, "sourceWordlistSha256": CSV_SHA256,
         "sampleRate": 44100, "speakerId": 1, "speed": 0.7, "noiseScale": 0.6, "noiseScaleW": 0.8,
         "addBlank": True, "padBoundary": True, "maxTokenCount": 510,
         "phonemesPath": "chinese-speech/phonemes.json", "phonemesSha256": phone_record["sha256"],
         "minimumRms": audition.MIN_AUDIBLE_RMS, "minimumPeak": audition.MIN_AUDIBLE_PEAK,
         "shards": shard_records, "licenses": license_records,
-        "keyFormat": "SHA256(trimmedText+LF+NFC(trimmedLowerPinyin)+LF+chunks joined U+001F; hanzi+U+001E+NFC(trimmedLowerPinyin))"}
+        "keyFormat": "SHA256(trimmedText+LF+NFC(trimmedLowerPinyin)+LF); whole Chinese text only"}
     from prepare_melo_duration import manifest as with_duration
     write_json(ASSETS / "manifest.json", with_duration(manifest))
     total = sum(record["entries"] for record in shard_records.values())
-    write_coverage({"schemaVersion": 1, "wordCount": 13223,
-        "exampleApplications": 26446, "uniqueReadingsIncludingWriting": total, "supported": total - len(unsupported),
+    vocabulary = vocabulary_rows()
+    examples = [example for row in vocabulary for example in json.loads(row["例句JSON"])]
+    from build_chinese_short_words import current_usage
+    write_coverage({"schemaVersion": 1, "wordCount": len(vocabulary),
+        "exampleApplications": len(examples), "chunkApplications": sum(len(example["chunks"]) for example in examples),
+        "pronunciationApplications": sum(len(entry["sources"]) for entries in shards.values() for entry in entries.values()),
+        "uniqueReadings": total, "supported": total - len(unsupported),
         "unsupported": len(unsupported), "exceptions": unsupported,
+        **current_usage({key: entry for entries in shards.values() for key, entry in entries.items()}),
         "evidenceBoundary": "Frontend conversion coverage, not full-corpus speech or device acceptance."})
     check()
 
 
 def check() -> None:
-    audition.rows()
+    vocabulary_rows()
     lock = audition.load_lock()
     duration_lock = json.loads((ROOT / "tools/melo_resources/duration-export.json").read_text(encoding="utf-8"))
     manifest = json.loads((ASSETS / "manifest.json").read_text(encoding="utf-8"))
     if (manifest["sourceModelSha256"] != audition.MODEL_SHA256 or manifest["modelSha256"] != duration_lock["sha256"] or manifest["modelRevision"] != audition.MODEL_REVISION
-            or manifest["sourceWordlistSha256"] != audition.CSV_SHA256 or manifest["sampleRate"] != 44100
+            or manifest["sourceWordlistSha256"] != CSV_SHA256 or manifest["sampleRate"] != 44100
             or manifest["speed"] != 0.7 or not manifest["padBoundary"] or not manifest["addBlank"]):
         raise ValueError("Chinese speech manifest changed its selected model or protocol")
     if manifest["sourceModelBytes"] != lock["sources"]["model.onnx"]["bytes"] or manifest["modelBytes"] != duration_lock["bytes"]:
@@ -154,8 +159,8 @@ def check() -> None:
         raise ValueError("Changed Chinese phoneme table")
     table = json.loads(phones_path.read_text(encoding="utf-8"))
     valid_tokens = {token for phones in table["syllables"].values() for token in phones} | set(table["punctuation"].values())
-    expected = {entry["key"] for entry in readings()}
-    actual, unsupported = set(), 0
+    expected = {entry["key"]: {name: value for name, value in entry.items() if name != "key"} for entry in readings()}
+    actual, unsupported, compiled = set(), 0, {}
     for name, record in manifest["shards"].items():
         path = ASSETS / name
         audition.verify_file(path, record)
@@ -163,17 +168,23 @@ def check() -> None:
         if len(entries) != record["entries"]:
             raise ValueError("Shard entry count mismatch")
         for key, entry in entries.items():
-            if key in actual or key != reading_key(entry["text"], entry["pinyin"], entry.get("chunks")) or name != f"shard_{key[:2]}.json":
+            if key in actual or key != reading_key(entry["text"], entry["pinyin"]) or name != f"shard_{key[:2]}.json":
                 raise ValueError("Chinese pronunciation key mismatch")
             actual.add(key)
+            compiled[key] = entry
+            if key not in expected or {field: entry.get(field) for field in ("text", "pinyin", "sources")} != expected[key]:
+                raise ValueError("Chinese shard content/provenance differs from current CSV")
             if "unsupportedReason" in entry:
                 unsupported += 1
                 continue
             ids, tones = entry["phoneIds"], entry["tones"]
             if not 1 <= len(ids) <= 510 or len(ids) != len(tones) or any(token not in valid_tokens for token in ids) or any(tone not in range(6) for tone in tones):
                 raise ValueError("Invalid Chinese token/tone sequence")
-    if actual != expected:
-        raise ValueError("Chinese sidecar does not cover current word/example/writing requests")
+    if actual != set(expected):
+        raise ValueError("Chinese sidecar does not cover current definition/example/chunk requests")
+    source = (ROOT / "core/media/src/main/kotlin/com/example/flashcardforteens/core/media/ChineseSpeech.kt").read_text(encoding="utf-8")
+    if f'WORDLIST_SHA256 = "{CSV_SHA256}"' not in source:
+        raise ValueError("Kotlin Chinese loader fingerprint differs from the current CSV")
     for name, record in manifest["licenses"].items():
         audition.verify_file(ASSETS / "licenses" / name, record)
     from build_chinese_short_words import check as check_short_words
@@ -182,13 +193,16 @@ def check() -> None:
         raise ValueError("Model binary/build-time runtime must not be stored in tracked sidecar assets")
     sidecar_bytes = sum(path.stat().st_size for path in ASSETS.rglob("*") if path.is_file())
     coverage = json.loads((ASSETS / "coverage.json").read_text(encoding="utf-8"))
-    if (coverage["sidecarBytes"] != sidecar_bytes or coverage["uniqueReadingsIncludingWriting"] != len(actual)
+    if (coverage["sidecarBytes"] != sidecar_bytes or coverage["uniqueReadings"] != len(actual)
             or coverage["supported"] != len(actual) - unsupported or coverage["unsupported"] != unsupported):
         raise ValueError("Chinese coverage counts/resource byte size are stale")
+    from build_chinese_short_words import current_usage
+    if any(coverage.get(key) != value for key, value in current_usage(compiled).items()):
+        raise ValueError("Current vocabulary reuse of historical reviewed PCM is stale")
     if sidecar_bytes + manifest["modelBytes"] > 200_000_000:
         raise ValueError("Chinese bundled resource budget exceeds 200 MB")
     audition.emit("chinese_resources_checked", readings=len(actual), supported=len(actual) - unsupported,
-        unsupported=unsupported, resourceBytes=sidecar_bytes + manifest["modelBytes"], wordlistSha256=audition.CSV_SHA256)
+        unsupported=unsupported, resourceBytes=sidecar_bytes + manifest["modelBytes"], wordlistSha256=CSV_SHA256)
 
 
 def main() -> None:

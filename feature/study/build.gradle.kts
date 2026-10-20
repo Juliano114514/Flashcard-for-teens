@@ -1,6 +1,6 @@
 plugins { id("flashcard.android.library"); id("flashcard.android.compose") }
 android {
-  namespace = "com.example.chinese_flashcard.feature.study"
+  namespace = "com.example.flashcardforteens.feature.study"
 }
 dependencies {
   implementation(project(":core:domain"))

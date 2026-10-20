@@ -2,6 +2,8 @@
 """Import/check reviewed Melo short-word PCM; no inference, downloads or CSV edits.
 
 --import-lab requires the external lab's approved selection and gain-only set.
+The import command remains tied to its historical 2026-10-14 Chinese corpus;
+it cannot re-label those listening results as evidence for a new wordlist.
 Only mono PCM16 payloads, pronunciation metadata and compact provenance enter
 the project. Full feedback, models, dependencies and experimental graphs stay
 in the lab. --check is standard-library-only and read-only.
@@ -23,7 +25,10 @@ import evaluate_melo_tts as audition
 ROOT = audition.ROOT
 ASSETS = ROOT / "core/media/src/main/assets/chinese-speech/short-words"
 LOCK = ROOT / "tools/melo_resources/short-words-source.json"
-KOTLIN = ROOT / "core/media/src/main/kotlin/com/example/chinese_flashcard/core/media/ChineseShortSpeech.kt"
+KOTLIN = ROOT / "core/media/src/main/kotlin/com/example/flashcardforteens/core/media/ChineseShortSpeech.kt"
+# This is the accepted 2026-10-14 listening corpus, not the current wordlist.
+# Retain its provenance; current-library reuse is calculated separately below.
+REVIEWED_SOURCE_SHA256 = "21b2dbf3103513c8b1749a5f2cfc17a94f7df3f9ca63f89748d4f9718a9388a7"
 RATE = 44100
 MAX_SAMPLES = RATE * 4
 HASH = re.compile(r"[0-9a-f]{64}")
@@ -129,10 +134,22 @@ def import_lab(lab: Path) -> None:
                   indexBytes=len(index_payload), indexSha256=digest(index_payload))
 
 
+def current_usage(current: dict[str, dict]) -> dict:
+    """Count only exact current frontend pronunciations that can use reviewed PCM."""
+    entries = load(ASSETS / "index.json")["entries"]
+    matching = [entry for key, entry in current.items() if key in entries
+                and "unsupportedReason" not in entry
+                and entry["text"] == entries[key]["text"] and entry["pinyin"] == entries[key]["pinyin"]
+                and entry["phoneIds"] == entries[key]["phoneIds"] and entry["tones"] == entries[key]["tones"]]
+    return {"reviewedPcmAvailable": len(entries), "reviewedPcmCurrentReadings": len(matching),
+            "reviewedPcmCurrentApplications": sum(len(entry["sources"]) for entry in matching),
+            "reviewedPcmSourceWordlistSha256": REVIEWED_SOURCE_SHA256}
+
+
 def check() -> None:
     from build_chinese_resources import reading_key
     lock = load(LOCK)
-    if lock["sourceModelSha256"] != audition.MODEL_SHA256 or lock["sourceWordlistSha256"] != audition.CSV_SHA256:
+    if lock["sourceModelSha256"] != audition.MODEL_SHA256 or lock["sourceWordlistSha256"] != REVIEWED_SOURCE_SHA256:
         raise ValueError("Reviewed short-word source identity changed")
     index_payload = (ASSETS / "index.json").read_bytes()
     if len(index_payload) != lock["index"]["bytes"] or digest(index_payload) != lock["index"]["sha256"]:

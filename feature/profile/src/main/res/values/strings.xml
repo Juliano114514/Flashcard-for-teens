@@ -1,0 +1,21 @@
+<resources>
+    <string name="profile_appearance_app">外观与应用</string>
+    <string name="profile_speech_storage">声音缓存</string>
+    <string name="profile_daily_words">每日新词</string>
+    <string name="profile_rounds">答对轮数</string>
+    <string name="profile_review_days">复习间隔</string>
+    <string name="profile_review_batch">每组复习</string>
+    <string name="profile_home_queue">首页单词数量</string>
+    <string name="profile_preload">提前准备声音</string>
+    <string name="profile_cache_capacity">缓存上限</string>
+    <string name="profile_clear_cache">清理缓存</string>
+    <string name="profile_reading_en">英语</string>
+    <string name="profile_reading_cn">中文</string>
+    <string name="profile_reading_both">英语和中文</string>
+    <string name="profile_reading_none">不朗读</string>
+    <string name="profile_reading_hint">点选声音，答题前只读英语</string>
+    <string name="profile_reading_summary">英语 / 中文</string>
+    <string name="profile_growth_progress">本级 %1$d / %2$d 天</string>
+    <string name="profile_growth_remaining">还差 %1$d 天</string>
+    <string name="profile_edit_name">修改名字</string>
+</resources>

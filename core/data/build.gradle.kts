@@ -109,7 +109,7 @@ val bundleDefaultWordlist = tasks.register<BundleDefaultWordlist>("bundleDefault
 }
 
 android {
-  namespace = "com.example.chinese_flashcard.core.data"
+  namespace = "com.example.flashcardforteens.core.data"
 }
 
 androidComponents.onVariants { variant ->

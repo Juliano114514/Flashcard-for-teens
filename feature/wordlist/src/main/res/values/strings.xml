@@ -1,0 +1,14 @@
+<resources>
+    <string name="wordbook_all_words">全部单词</string>
+    <string name="wordbook_collection">我的收藏</string>
+    <string name="wordbook_all_books">全部课本</string>
+    <string name="wordbook_selected_books">已选 %1$d 本</string>
+    <string name="wordbook_choose_books">选择课本</string>
+    <string name="wordbook_choose_books_hint">可以同时选择几本课本</string>
+    <string name="wordbook_unlearned">未学</string>
+    <string name="wordbook_learning">在学</string>
+    <string name="wordbook_learning_progress">在学 %1$d/%2$d</string>
+    <string name="wordbook_learned">已学</string>
+    <string name="wordbook_skipped">跳过</string>
+    <string name="wordbook_progress">已学 %1$d / %2$d</string>
+</resources>

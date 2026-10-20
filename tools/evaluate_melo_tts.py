@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
-"""Audition the fixed Melo FP32 model; never modify Android assets or the CSV.
+"""Historical Chinese-corpus Melo audition; shared pinned runtime/model helpers.
+
+The sample/audit commands require the original 13,223-row Chinese snapshot.
+They intentionally reject the new English-centred CSV. Current coverage belongs
+to build_chinese_resources.py, never to these historical listening reports.
 
 --prepare downloads checksum-locked sources only into .gradle/melo-resource-source.
 --samples uses the existing, archive-verified task-local Python runtime and writes
@@ -32,7 +36,9 @@ LEGACY = ROOT / ".gradle" / "chinese-speech-samples"
 LOCK = ROOT / "tools" / "melo_resources" / "source-lock.json"
 RUNTIME_LOCK = ROOT / "tools" / "melo_resources" / "runtime-lock.json"
 CSV = ROOT / "wordlist.csv"
-CSV_SHA256 = "21b2dbf3103513c8b1749a5f2cfc17a94f7df3f9ca63f89748d4f9718a9388a7"
+HISTORICAL_CSV_SHA256 = "21b2dbf3103513c8b1749a5f2cfc17a94f7df3f9ca63f89748d4f9718a9388a7"
+# Compatibility for historical audit scripts/records, never current coverage.
+CSV_SHA256 = HISTORICAL_CSV_SHA256
 MODEL_REVISION = "a0d5c6a264c0ef92d70d8661d8cc502d79627cd6"
 MODEL_SHA256 = "bf30582eb1b012250a35b1a4a80e7dfbcf8485e7bb9de0d95efbbeef0e4ad86d"
 INPUTS = {"x", "x_lengths", "tones", "sid", "noise_scale", "length_scale", "noise_scale_w"}

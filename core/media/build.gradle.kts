@@ -11,7 +11,7 @@ import org.gradle.api.tasks.TaskAction
 
 plugins { id("flashcard.android.library") }
 android {
-  namespace = "com.example.chinese_flashcard.core.media"
+  namespace = "com.example.flashcardforteens.core.media"
   // Keep the mapped Chinese model uncompressed; the English model supports ZIP compression.
   androidResources { noCompress += "chinese-speech/model-duration.onnx" }
 }

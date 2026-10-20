@@ -1,4 +1,4 @@
-name: Android CI and Release
+name: Flashcard for Teens CI and Release
 
 on:
   push:
@@ -48,23 +48,11 @@ jobs:
       - uses: gradle/actions/setup-gradle@4c125117fe7c5aed11272ec4213f602f012f89f2 # v5
       - name: Install Android SDK packages
         run: '"$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-36.1" "build-tools;36.0.0"'
-      - name: Prepare pinned stroke sources (cache only)
-        run: |
-          python3 - <<'PY'
-          import sys
-          sys.path.insert(0, 'tools')
-          import build_wordlist_strokes as strokes
-          strokes.MM_CACHE.mkdir(parents=True, exist_ok=True)
-          (strokes.MM_CACHE / 'revision.txt').write_text(strokes.MM_REVISION, encoding='utf-8')
-          strokes.read_sources(check=False)
-          PY
       - name: Prepare pinned Chinese model (cache only)
         run: python3 tools/build_chinese_resources.py --prepare
       - name: Check frozen data and generated assets
         run: |
           python3 tools/rebuild_wordlist.py --check
-          python3 tools/build_wordlist_strokes.py --check
-          python3 tools/build_demo.py --check
           python3 tools/build_english_resources.py --check
           python3 tools/build_chinese_resources.py --check
       - name: Lint and compile Debug
@@ -75,7 +63,7 @@ jobs:
       - name: Upload Debug APK
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6, Node 24
         with:
-          name: Chinese-Flashcard-debug-${{ needs.version.outputs.version }}
+          name: Flashcard-for-Teens-debug-${{ needs.version.outputs.version }}
           path: app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
           retention-days: 14
@@ -175,7 +163,7 @@ jobs:
           unset ANDROID_KEYSTORE_BASE64
           tools="$ANDROID_HOME/build-tools/36.0.0"
           mkdir -p dist
-          apk="dist/Chinese_Flashcard_v${VERSION}.apk"
+          apk="dist/Flashcard_for_Teens_v${VERSION}.apk"
           "$tools/zipalign" -P 16 -f 4 unsigned/app-release-unsigned.apk "$RUNNER_TEMP/aligned.apk"
           "$tools/apksigner" sign --ks "$key_file" --ks-key-alias "$ANDROID_KEY_ALIAS" \
             --ks-pass env:ANDROID_STORE_PASSWORD --key-pass env:ANDROID_KEY_PASSWORD \
@@ -187,13 +175,13 @@ jobs:
           import os
           from pathlib import Path
           text = (Path(os.environ['RUNNER_TEMP']) / 'apk-badging.txt').read_text()
-          assert "name='com.example.chinese_flashcard'" in text
+          assert "name='com.example.flashcardforteens'" in text
           assert f"versionName='{os.environ['VERSION']}'" in text
           assert f"versionCode='{os.environ['VERSION_CODE']}'" in text
           assert 'application-debuggable' not in text
           print('APK identity, version and non-debuggable status verified')
           PY
-          (cd dist && sha256sum "Chinese_Flashcard_v${VERSION}.apk" > SHA256SUMS.txt)
+          (cd dist && sha256sum "Flashcard_for_Teens_v${VERSION}.apk" > SHA256SUMS.txt)
           python3 tools/ci_release.py --notes dist/release-notes.md
       - name: Publish GitHub Release
         if: steps.existing.outputs.published != 'true'
@@ -202,9 +190,9 @@ jobs:
         run: |
           set -euo pipefail
           if ! gh release view "$TAG" >/dev/null 2>&1; then
-            gh release create "$TAG" --target "$GITHUB_SHA" --title "Chinese Flashcard $VERSION" \
+            gh release create "$TAG" --target "$GITHUB_SHA" --title "Flashcard for Teens $VERSION" \
               --draft --notes-file dist/release-notes.md
           fi
-          gh release upload "$TAG" "dist/Chinese_Flashcard_v${VERSION}.apk" dist/SHA256SUMS.txt --clobber
+          gh release upload "$TAG" "dist/Flashcard_for_Teens_v${VERSION}.apk" dist/SHA256SUMS.txt --clobber
           gh release edit "$TAG" --draft=false --latest --notes-file dist/release-notes.md
           gh release view "$TAG" --json url --jq '.url' >> "$GITHUB_STEP_SUMMARY"
