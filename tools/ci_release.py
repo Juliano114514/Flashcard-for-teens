@@ -34,7 +34,7 @@ def release_notes(version, code):
                         section.group(1), re.M | re.S)
     if concise:
         return concise.group(1).strip() + "\n"
-    return (f"# Flashcard for Teens {version}\n\n"
+    return (f"# 单词宝 {version}\n\n"
             f"Android release APK · versionCode {code}\n\n"
             f"{section.group(1).strip()}\n\n"
             "本 Release 的 APK 由 GitHub Actions 编译、签名并校验；"
@@ -66,10 +66,13 @@ def main():
         ).stdout
         old_version, old_code = read_version(previous)
         if application_id(previous) != application_id(current):
-            # This is a distinct installed application, with an explicitly reset baseline.
-            # CI still validates it; publishing its first Release requires manual intent.
-            if application_id(current) != "com.example.flashcardforteens" or (version, code) != ("0.0.1", 1):
+            # Only the recorded Chinese-app -> English-app migration is allowed.
+            # The explicitly authorized 1.0.0 publication is its own installed app.
+            if (application_id(previous) != "com.example.chinese_flashcard"
+                    or application_id(current) != "com.example.flashcardforteens"
+                    or (version, code) not in (("0.0.1", 1), ("1.0.0", 9))):
                 raise ValueError("Unexpected application identity/version reset")
+            publish = (version, code) == ("1.0.0", 9)
         elif (version, code) != (old_version, old_code):
             if (tuple(map(int, version.split("."))) <= tuple(map(int, old_version.split(".")))
                     or code <= old_code):

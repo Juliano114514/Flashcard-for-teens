@@ -1,4 +1,4 @@
-name: Flashcard for Teens CI and Release
+name: 单词宝 CI and Release
 
 on:
   push:
@@ -63,7 +63,7 @@ jobs:
       - name: Upload Debug APK
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6, Node 24
         with:
-          name: Flashcard-for-Teens-debug-${{ needs.version.outputs.version }}
+          name: Dancibao-debug-${{ needs.version.outputs.version }}
           path: app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
           retention-days: 14
@@ -163,7 +163,7 @@ jobs:
           unset ANDROID_KEYSTORE_BASE64
           tools="$ANDROID_HOME/build-tools/36.0.0"
           mkdir -p dist
-          apk="dist/Flashcard_for_Teens_v${VERSION}.apk"
+          apk="dist/Dancibao_v${VERSION}.apk"
           "$tools/zipalign" -P 16 -f 4 unsigned/app-release-unsigned.apk "$RUNNER_TEMP/aligned.apk"
           "$tools/apksigner" sign --ks "$key_file" --ks-key-alias "$ANDROID_KEY_ALIAS" \
             --ks-pass env:ANDROID_STORE_PASSWORD --key-pass env:ANDROID_KEY_PASSWORD \
@@ -181,7 +181,7 @@ jobs:
           assert 'application-debuggable' not in text
           print('APK identity, version and non-debuggable status verified')
           PY
-          (cd dist && sha256sum "Flashcard_for_Teens_v${VERSION}.apk" > SHA256SUMS.txt)
+          (cd dist && sha256sum "Dancibao_v${VERSION}.apk" > SHA256SUMS.txt)
           python3 tools/ci_release.py --notes dist/release-notes.md
       - name: Publish GitHub Release
         if: steps.existing.outputs.published != 'true'
@@ -190,9 +190,9 @@ jobs:
         run: |
           set -euo pipefail
           if ! gh release view "$TAG" >/dev/null 2>&1; then
-            gh release create "$TAG" --target "$GITHUB_SHA" --title "Flashcard for Teens $VERSION" \
+            gh release create "$TAG" --target "$GITHUB_SHA" --title "单词宝 $VERSION" \
               --draft --notes-file dist/release-notes.md
           fi
-          gh release upload "$TAG" "dist/Flashcard_for_Teens_v${VERSION}.apk" dist/SHA256SUMS.txt --clobber
+          gh release upload "$TAG" "dist/Dancibao_v${VERSION}.apk" dist/SHA256SUMS.txt --clobber
           gh release edit "$TAG" --draft=false --latest --notes-file dist/release-notes.md
           gh release view "$TAG" --json url --jq '.url' >> "$GITHUB_STEP_SUMMARY"

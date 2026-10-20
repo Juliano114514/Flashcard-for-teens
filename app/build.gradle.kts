@@ -8,8 +8,8 @@ android {
   defaultConfig {
     applicationId = "com.example.flashcardforteens"
     targetSdk = 36
-    versionCode = 6
-    versionName = "0.1.0"
+    versionCode = 9
+    versionName = "1.0.0"
 
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
   }
