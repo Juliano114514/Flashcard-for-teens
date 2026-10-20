@@ -57,7 +57,16 @@ data class TodaySummary(val date: String, val dailyGoal: Int, val totalWords: In
   val learnMoreBlocker: StudyKind? = null, val stageProgress: StageProgress = StageProgress(),
   val collectionsAvailable: Int = 0, val mistakesAvailable: Int = 0,
   val growth: StudyGrowth = StudyGrowth(), val contextVersion: Long = 0,
-  val availableReviewWords: Int = 0) {
+  val availableReviewWords: Int = 0,
+  val dailyNewPlanned: Int = minOf(dailyGoal, newPlanned),
+  val dailyNewCompleted: Int = minOf(newCompleted, dailyNewPlanned),
+  val dueReviewPlanned: Int = reviewPlanned,
+  val dueReviewCompleted: Int = reviewCompleted) {
+  // Queue totals below still include optional batches; these counts are only for goal display.
+  val extraNewPlanned: Int get() = (newPlanned - dailyNewPlanned).coerceAtLeast(0)
+  val extraNewCompleted: Int get() = (newCompleted - dailyNewCompleted).coerceAtLeast(0)
+  val extraReviewPlanned: Int get() = (reviewPlanned - dueReviewPlanned).coerceAtLeast(0)
+  val extraReviewCompleted: Int get() = (reviewCompleted - dueReviewCompleted).coerceAtLeast(0)
   val planned: Int get() = newPlanned + reviewPlanned + carryoverPlanned
   val completed: Int get() = newCompleted + reviewCompleted + carryoverCompleted
   val allComplete: Boolean get() = planned > 0 && completed == planned

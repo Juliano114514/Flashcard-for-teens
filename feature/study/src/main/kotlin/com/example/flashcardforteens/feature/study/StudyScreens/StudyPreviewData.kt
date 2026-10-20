@@ -21,3 +21,10 @@ internal val PreviewToday = TodaySummary(date = "2026-10-18", dailyGoal = 10, to
   reviewPlanned = 3, reviewCompleted = 1, carryoverPlanned = 2, carryoverCompleted = 0,
   availableNewWords = 50, collectionsAvailable = 12, mistakesAvailable = 3,
   stageProgress = StageProgress(VocabularyStage.GRADE_3_FIRST, learned = 240, total = 372))
+
+internal val PreviewDueToday = PreviewToday.copy(newCompleted = 0, reviewPlanned = 44, reviewCompleted = 0,
+  carryoverPlanned = 0, carryoverCompleted = 0, dailyNewCompleted = 0,
+  dueReviewPlanned = 44, dueReviewCompleted = 0)
+
+internal val PreviewExtraToday = PreviewDueToday.copy(newPlanned = 20, newCompleted = 12,
+  reviewPlanned = 54, reviewCompleted = 46, dailyNewCompleted = 10, dueReviewCompleted = 44)

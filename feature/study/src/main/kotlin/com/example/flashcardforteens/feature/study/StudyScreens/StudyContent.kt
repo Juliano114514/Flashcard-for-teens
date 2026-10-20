@@ -29,8 +29,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.tooling.preview.Preview
 import com.example.flashcardforteens.core.domain.CardPhase
@@ -82,8 +80,25 @@ internal fun StudyContent(
 ) {
   val card = state.card
   val practice = state.snapshot?.practice?.takeIf { it.kind == card?.kind }
-  val completed = practice?.completed ?: state.today?.completed ?: 0
-  val planned = practice?.planned ?: state.today?.planned ?: 0
+  val today = state.today
+  val (completed, planned) = if (practice != null) practice.completed to practice.planned else when (card?.kind) {
+    StudyKind.NEW -> (today?.dailyNewCompleted ?: 0) to (today?.dailyNewPlanned ?: 0)
+    StudyKind.REVIEW -> (today?.dueReviewCompleted ?: 0) to (today?.dueReviewPlanned ?: 0)
+    StudyKind.CARRYOVER -> (today?.carryoverCompleted ?: 0) to (today?.carryoverPlanned ?: 0)
+    else -> 0 to 0
+  }
+  val progressLabel = when (card?.kind) {
+    StudyKind.NEW -> uiString(R.string.progress_daily_learning)
+    StudyKind.REVIEW -> uiString(R.string.progress_due_review)
+    StudyKind.CARRYOVER -> uiString(R.string.progress_carryover)
+    StudyKind.COLLECTION -> uiString(UiR.string.ui_collections)
+    else -> uiString(UiR.string.ui_mistakes_3bd9fb)
+  }
+  val (extraCompleted, extraPlanned) = when (card?.kind) {
+    StudyKind.NEW -> (today?.extraNewCompleted ?: 0) to (today?.extraNewPlanned ?: 0)
+    StudyKind.REVIEW -> (today?.extraReviewCompleted ?: 0) to (today?.extraReviewPlanned ?: 0)
+    else -> 0 to 0
+  }
   Box(Modifier.fillMaxSize().flashcardBackground()) {
   Scaffold(containerColor = Color.Transparent, contentColor = MaterialTheme.colorScheme.onBackground,
     contentWindowInsets = if (card != null && card.phase != CardPhase.FINISHED) WindowInsets(0, 0, 0, 0)
@@ -120,16 +135,17 @@ internal fun StudyContent(
       }
     })
     if (card != null && card.phase != CardPhase.FINISHED && state.snapshot != null) {
-      Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp).padding(bottom = 8.dp),
-        horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
-        if (!card.reviewRecall && card.phase in listOf(CardPhase.INTRO, CardPhase.QUESTION, CardPhase.FEEDBACK)) {
-          RoundProgress(card)
+      Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp).padding(bottom = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp),
+          verticalAlignment = Alignment.CenterVertically) {
+          if (!card.reviewRecall && card.phase in listOf(CardPhase.INTRO, CardPhase.QUESTION, CardPhase.FEEDBACK)) {
+            RoundProgress(card)
+          }
+          LabeledDailyProgress(progressLabel, completed, planned, Modifier.weight(1f))
         }
-        DailyProgress(completed, planned, Modifier.weight(1f))
-        val countDescription = uiString(UiR.string.ui_progress_count, completed, planned)
-        Text(uiString(UiR.string.ui_fraction, completed, planned),
-          modifier = Modifier.semantics { contentDescription = countDescription },
-          style = MaterialTheme.typography.labelMedium, color = FlashcardStyle.colors.gradientSecondaryInk)
+        if (extraPlanned > 0) LabeledDailyProgress(uiString(if (card.kind == StudyKind.NEW)
+          R.string.progress_extra_learning else R.string.progress_extra_review), extraCompleted, extraPlanned)
       }
     }
     }
@@ -216,10 +232,14 @@ internal fun StudyContent(
           if (practice != null) {
             CompletionCount(if (practice.kind == StudyKind.COLLECTION) uiString(UiR.string.ui_collections) else uiString(UiR.string.ui_mistakes_3bd9fb), completed, planned)
           } else state.today?.let { today ->
-            Text(uiString(UiR.string.ui_1_s_2_s_words_today, today.completed, today.planned))
-            CompletionCount(uiString(UiR.string.ui_learn_2118cb), today.newCompleted, today.newPlanned)
-            CompletionCount(uiString(UiR.string.ui_reviews), today.reviewCompleted, today.reviewPlanned)
-            if (today.carryoverPlanned > 0) CompletionCount(uiString(UiR.string.ui_continued), today.carryoverCompleted, today.carryoverPlanned)
+            CompletionCount(uiString(R.string.progress_daily_learning), today.dailyNewCompleted, today.dailyNewPlanned)
+            CompletionCount(uiString(R.string.progress_due_review), today.dueReviewCompleted, today.dueReviewPlanned)
+            if (today.extraNewPlanned > 0) CompletionCount(uiString(R.string.progress_extra_learning),
+              today.extraNewCompleted, today.extraNewPlanned)
+            if (today.extraReviewPlanned > 0) CompletionCount(uiString(R.string.progress_extra_review),
+              today.extraReviewCompleted, today.extraReviewPlanned)
+            if (today.carryoverPlanned > 0) CompletionCount(uiString(R.string.progress_carryover),
+              today.carryoverCompleted, today.carryoverPlanned)
             today.nextReviewDate?.let { date ->
               Text(uiString(UiR.string.ui_next_review_1_s, date), style = MaterialTheme.typography.titleMedium,
                 color = FlashcardStyle.colors.gradientAction)
@@ -374,7 +394,28 @@ private fun CompletionPreview() {
   StudyPagePreview(StageThemePreviewCase(VocabularyStage.GRADE_3_FIRST, false),
     PreviewCard.copy(phase = CardPhase.FINISHED),
     today = PreviewToday.copy(newCompleted = PreviewToday.newPlanned,
-      reviewCompleted = PreviewToday.reviewPlanned, carryoverCompleted = PreviewToday.carryoverPlanned))
+      reviewCompleted = PreviewToday.reviewPlanned, carryoverCompleted = PreviewToday.carryoverPlanned,
+      dailyNewCompleted = PreviewToday.dailyNewPlanned, dueReviewCompleted = PreviewToday.dueReviewPlanned))
+}
+
+@Preview(name = "Learning · daily plan 10", widthDp = 360, heightDp = 640)
+@Composable
+private fun LearningSplitProgressPreview() {
+  StudyPagePreview(StageThemePreviewCase(VocabularyStage.GRADE_3_FIRST, false), PreviewCard, today = PreviewDueToday)
+}
+
+@Preview(name = "Review · due words 44", widthDp = 360, heightDp = 640)
+@Composable
+private fun ReviewSplitProgressPreview() {
+  StudyPagePreview(StageThemePreviewCase(VocabularyStage.GRADE_3_FIRST, false),
+    PreviewCard.copy(kind = StudyKind.REVIEW, reviewRecall = true, round = 1, targetRounds = 1), today = PreviewDueToday)
+}
+
+@Preview(name = "Review · optional batch", widthDp = 320, heightDp = 640, fontScale = 1.3f)
+@Composable
+private fun ReviewExtraProgressPreview() {
+  StudyPagePreview(StageThemePreviewCase(VocabularyStage.GRADE_3_FIRST, false),
+    PreviewCard.copy(kind = StudyKind.REVIEW, reviewRecall = true, round = 1, targetRounds = 1), today = PreviewExtraToday)
 }
 
 @Preview(name = "Wrong answer revealed", widthDp = 360, heightDp = 640)

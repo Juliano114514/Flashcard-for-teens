@@ -695,7 +695,9 @@ class FlashcardRepositories(context: Context) {
       dao.putCycle(cycle)
       if (normal) dao.putProgress(saved.copy(activeCycleId = cycle.id))
       dao.putDailyItem(DailyItemEntity(day, word.id, StudyKind.NEW.name, cycle.id,
-        firstBatch + index / 5, index.toLong(), originStage = stage.code, originLap = state.lap))
+        firstBatch + index / 5, index.toLong(), originStage = stage.code, originLap = state.lap,
+        // Like reviewMore, optional batches use their own IDs rather than canonical daily-plan IDs.
+        id = if (allowNewLap) newId() else "$day:${StudyKind.NEW.name}:${cycle.id}:${word.id}"))
     }
     return true
   }
@@ -1013,6 +1015,14 @@ class FlashcardRepositories(context: Context) {
       it.kind == kind.name && (kind != StudyKind.NEW || it.originStage == stage.code) &&
         (complete == null || it.completed == complete)
     }
+    // Scheduled items retain day:kind:cycle:word IDs even when an incorrect answer changes cycleId.
+    // Existing optional reviews have UUID IDs. Older optional NEW batches used canonical IDs too;
+    // batch order and the frozen quota keep those later words out of the initial daily goal.
+    val plannedNew = items.filter { it.kind == StudyKind.NEW.name && it.originStage == stage.code &&
+      it.id.startsWith("$day:${StudyKind.NEW.name}:") }
+      .sortedWith(compareBy<DailyItemEntity> { it.batch }.thenBy { it.id }).take(plan.dailyGoal)
+    val dueReview = items.filter { it.kind == StudyKind.REVIEW.name &&
+      it.id.startsWith("$day:${StudyKind.REVIEW.name}:") }.groupBy { it.wordId }
     val words = dao.studyWords()
     val stageWords = words.filter { it.stage == stage.code && progress[it.id]?.isSkipped != true }
     val completed = dao.stageCompletions(stage.code, state.lap).map { it.wordId }.toSet()
@@ -1038,7 +1048,10 @@ class FlashcardRepositories(context: Context) {
       words.count { progress[it.id]?.mistakePending == true && progress[it.id]?.isSkipped != true },
       appState().let { StudyGrowth(it.growthDays, it.learnedCompletions, it.clearedMistakes) },
       contextVersion = appState().contextVersion,
-      availableReviewWords = reviewCandidates(day, words, progress).size)
+      availableReviewWords = reviewCandidates(day, words, progress).size,
+      dailyNewPlanned = plannedNew.size, dailyNewCompleted = plannedNew.count { it.completed },
+      dueReviewPlanned = dueReview.size,
+      dueReviewCompleted = dueReview.values.count { group -> group.any { it.completed } })
   }
 
   private suspend fun learnMoreBlocker(day: Long, items: List<DailyItemEntity>, stage: VocabularyStage): StudyKind? {

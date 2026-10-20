@@ -24,6 +24,8 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.example.flashcardforteens.core.ui.FlashcardDialog
@@ -38,6 +40,21 @@ internal fun DailyProgress(completed: Int, planned: Int, modifier: Modifier = Mo
     if (planned <= 0) 0f else (completed.toFloat() / planned).coerceIn(0f, 1f)
   }, modifier = modifier.fillMaxWidth().height(8.dp).clip(MaterialTheme.shapes.small),
     color = FlashcardStyle.colors.success, trackColor = MaterialTheme.colorScheme.surfaceContainerHighest)
+}
+
+@Composable
+internal fun LabeledDailyProgress(label: String, completed: Int, planned: Int, modifier: Modifier = Modifier) {
+  val countDescription = uiString(UiR.string.ui_progress_count, completed, planned)
+  Column(modifier.fillMaxWidth().semantics(mergeDescendants = true) {
+    contentDescription = "$label，$countDescription"
+  }, verticalArrangement = Arrangement.spacedBy(5.dp)) {
+    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
+      horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+      Text(label, Modifier.weight(1f), style = MaterialTheme.typography.labelLarge)
+      Text(uiString(UiR.string.ui_fraction, completed, planned), style = MaterialTheme.typography.labelMedium)
+    }
+    DailyProgress(completed, planned)
+  }
 }
 
 @Composable

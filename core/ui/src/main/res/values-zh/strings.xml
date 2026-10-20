@@ -293,7 +293,7 @@
         <item quantity="one">"已练习 %1$d 个词。"</item>
         <item quantity="other">"已练习 %1$d 个词。"</item>
     </plurals>
-    <string name="ui_app_name">"Flashcard for Teens"</string>
+    <string name="ui_app_name">"单词宝"</string>
     <string name="ui_reading_options">"朗读设置"</string>
     <string name="ui_reading_options_summary">"听英语，听中文"</string>
     <string name="ui_reading_options_description">"选一选，每个地方想听什么声音。题目和答题前的例句只读英语；学习音效在设置中单独开关。"</string>

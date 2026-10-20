@@ -3,6 +3,7 @@ package com.example.flashcardforteens.feature.study
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -254,25 +255,30 @@ private fun HomeStudyPanel(
     color = Color.Transparent,
     border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = .12f))) {
     Column(Modifier.background(Brush.linearGradient(listOf(MaterialTheme.colorScheme.primaryContainer,
-      MaterialTheme.colorScheme.secondaryContainer))).padding(16.dp),
+      MaterialTheme.colorScheme.secondaryContainer))).padding(horizontal = 16.dp).padding(top = 12.dp, bottom = 16.dp),
       verticalArrangement = Arrangement.spacedBy(12.dp)) {
       Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp)) {
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(5.dp)) {
           val title = when {
             today.allComplete -> uiString(R.string.home_goal_complete)
-            today.planned > 0 -> uiString(R.string.home_goal_remaining, (today.planned - today.completed).coerceAtLeast(0))
+            today.planned > 0 -> uiString(R.string.home_goal_remaining)
             else -> uiString(R.string.home_goal_first)
           }
           Text(title, style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.onPrimaryContainer)
-          Text(uiString(UiR.string.ui_progress_count, today.completed, today.planned),
-            style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = .75f))
         }
-        LearningIllustration(Modifier.size(56.dp))
+        LearningIllustration(Modifier.size(40.dp))
       }
-      DailyProgress(today.completed, today.planned)
+      LabeledDailyProgress(uiString(R.string.progress_daily_learning), today.dailyNewCompleted, today.dailyNewPlanned)
+      LabeledDailyProgress(uiString(R.string.progress_due_review), today.dueReviewCompleted, today.dueReviewPlanned)
+      if (today.extraNewPlanned > 0) LabeledDailyProgress(uiString(R.string.progress_extra_learning),
+        today.extraNewCompleted, today.extraNewPlanned)
+      if (today.extraReviewPlanned > 0) LabeledDailyProgress(uiString(R.string.progress_extra_review),
+        today.extraReviewCompleted, today.extraReviewPlanned)
+      if (today.carryoverPlanned > 0) LabeledDailyProgress(uiString(R.string.progress_carryover),
+        today.carryoverCompleted, today.carryoverPlanned)
       LearningPrimaryButton(onClick = { nextAction?.let(open) }, enabled = !busy && nextAction != null,
-        modifier = Modifier.fillMaxWidth()) {
+        modifier = Modifier.fillMaxWidth().padding(top = 8.dp)) {
         Icon(FlashcardIcons.Play, contentDescription = null, modifier = Modifier.size(20.dp))
         Text(uiString(when (nextAction) {
           HomeAction.RESUME, HomeAction.CARRYOVER -> UiR.string.ui_continue_learning
@@ -350,7 +356,8 @@ private fun HomeActionTile(item: HomeActionItem, modifier: Modifier, onClick: ()
   Surface(onClick = onClick, enabled = item.enabled, modifier = modifier,
     shape = MaterialTheme.shapes.large, color = glassPanelColor(),
     border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = .65f))) {
-    Column(Modifier.heightIn(min = 88.dp).padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    Column(Modifier.heightIn(min = 72.dp).padding(horizontal = 12.dp, vertical = 10.dp),
+      verticalArrangement = Arrangement.spacedBy(6.dp)) {
       Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         Icon(item.icon, contentDescription = null, modifier = Modifier.size(18.dp),
           tint = if (item.enabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant)
@@ -434,12 +441,13 @@ private fun HomeWordShowcase(
 ) {
   Surface(Modifier.fillMaxWidth().glassPanel(), shape = MaterialTheme.shapes.large,
     color = glassPanelColor()) {
-    Column(Modifier.padding(horizontal = 20.dp).padding(top = 8.dp, bottom = 16.dp),
-      verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    Column(Modifier.padding(horizontal = 20.dp).padding(top = 4.dp, bottom = 16.dp),
+      verticalArrangement = Arrangement.spacedBy(6.dp)) {
       Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
         Text(uiString(UiR.string.ui_word_discovery), Modifier.weight(1f), style = MaterialTheme.typography.titleSmall,
           color = MaterialTheme.colorScheme.onSurfaceVariant)
         TextButton(onClick = onShuffle, enabled = !loading && !busy && !shuffleWaiting && (word != null || wordError),
+          modifier = Modifier.height(32.dp), contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp),
           shape = MaterialTheme.shapes.small) {
           if (shuffleWaiting) SpeechPreparingIndicator() else Icon(Icons.Default.Refresh, contentDescription = null,
             modifier = Modifier.size(17.dp))
@@ -499,8 +507,17 @@ private fun HomePreview() { HomePreviewContent(PreviewToday) }
 @Composable
 private fun HomeCompletePreview() {
   HomePreviewContent(PreviewToday.copy(newCompleted = PreviewToday.newPlanned,
-    reviewCompleted = PreviewToday.reviewPlanned, carryoverCompleted = PreviewToday.carryoverPlanned))
+    reviewCompleted = PreviewToday.reviewPlanned, carryoverCompleted = PreviewToday.carryoverPlanned,
+    dailyNewCompleted = PreviewToday.dailyNewPlanned, dueReviewCompleted = PreviewToday.dueReviewPlanned))
 }
+
+@Preview(name = "Home · learning 10 and due review 44", widthDp = 360, heightDp = 760)
+@Composable
+private fun HomeSplitProgressPreview() = HomePreviewContent(PreviewDueToday)
+
+@Preview(name = "Home · optional batches", widthDp = 320, heightDp = 760, fontScale = 1.3f)
+@Composable
+private fun HomeExtraProgressPreview() = HomePreviewContent(PreviewExtraToday)
 
 @Preview(name = "Home · first word", widthDp = 360, heightDp = 760)
 @Composable

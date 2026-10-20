@@ -5,7 +5,12 @@
     <string name="home_term_progress">本学期已学 %1$d / %2$d 词</string>
     <string name="home_term_percent">%1$d%%</string>
     <string name="home_goal_complete">目标完成啦！</string>
-    <string name="home_goal_remaining">再学 %1$d 个词</string>
+    <string name="home_goal_remaining">今日计划</string>
+    <string name="progress_daily_learning">今日学习</string>
+    <string name="progress_due_review">到期复习</string>
+    <string name="progress_extra_learning">今日加学</string>
+    <string name="progress_extra_review">额外复习</string>
+    <string name="progress_carryover">上次未完成</string>
     <string name="home_goal_first">从第一个单词开始</string>
     <string name="home_start_review">开始复习</string>
     <string name="home_review_more">再复习几个</string>
